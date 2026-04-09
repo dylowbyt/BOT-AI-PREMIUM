@@ -34,29 +34,30 @@ setInterval(() => {
   if (processed.size > 5000) processed.clear()
 }, 300000)
 
-// ===== TTS — suara otomatis ikut persona =====
+// ===== TTS =====
 const PERSONA_VOICE_CONFIG = {
   default: {
     voice: "nova",
-    instructions: "Bicara dengan nada hangat, natural, dan ramah dalam Bahasa Indonesia. Seperti orang yang berbicara langsung, bukan membaca teks. Jeda sewajarnya."
+    instructions: "Bicara dengan nada hangat, natural, dan ramah dalam Bahasa Indonesia."
   },
   santai: {
     voice: "fable",
-    instructions: "Bicara dengan nada santai dan kasual dalam Bahasa Indonesia. Seperti teman ngobrol yang asik. Nada rileks, tidak terburu-buru, sesekali ada sedikit keakraban."
+    instructions: "Nada santai dan kasual seperti teman ngobrol."
   },
   galak: {
     voice: "onyx",
-    instructions: "Bicara dengan nada tegas, lugas, dan berwibawa dalam Bahasa Indonesia. Suara dalam dan serius. Tidak basa-basi, langsung ke poin."
+    instructions: "Nada tegas, lugas, dan serius."
   },
   anime: {
     voice: "shimmer",
-    instructions: "Bicara dengan nada ceria, playful, dan sedikit manja dalam Bahasa Indonesia. Seperti karakter anime perempuan yang energetik dan ekspresif. Nada naik-turun dengan semangat."
+    instructions: "Nada ceria dan ekspresif seperti karakter anime."
   }
 }
 
 async function textToSpeech(text, persona = "default", voiceOverride = null) {
   const config = PERSONA_VOICE_CONFIG[persona] || PERSONA_VOICE_CONFIG["default"]
   const voice = voiceOverride || config.voice
+
   const audio = await openai.audio.speech.create({
     model: "gpt-4o-mini-tts",
     voice: voice,
@@ -64,10 +65,10 @@ async function textToSpeech(text, persona = "default", voiceOverride = null) {
     instructions: config.instructions,
     format: "opus"
   })
+
   return Buffer.from(await audio.arrayBuffer())
 }
 
-// ===== HELPER SEND =====
 async function sendReply(sock, from, sender, text) {
   const userSetting = getSettings(sender)
 
@@ -78,6 +79,7 @@ async function sendReply(sock, from, sender, text) {
         userSetting.persona || "default",
         userSetting.voiceOverride || null
       )
+
       await sock.sendMessage(from, {
         audio: audioBuffer,
         mimetype: "audio/ogg; codecs=opus",
@@ -92,7 +94,6 @@ async function sendReply(sock, from, sender, text) {
   await sock.sendMessage(from, { text })
 }
 
-// ===== INIT PLUGIN FOLDER =====
 if (!fs.existsSync("./plugins")) {
   fs.mkdirSync("./plugins", { recursive: true })
 }
@@ -162,22 +163,7 @@ async function startBot() {
       const isGroup = from.endsWith("@g.us")
       const sender = m.key.participant || m.key.remoteJid
 
-      // ===== AUTOPILOT CHECK (semua pesan grup) =====
-      if (isGroup) {
-        try {
-          const autopilot = require("./plugins/autopilot")
-          if (autopilot?.check) {
-            const blocked = await autopilot.check(sock, m, { text, sender, from, imageBuffer })
-            if (blocked) return
-          }
-        } catch (e) {
-          console.log("Autopilot load error:", e.message)
-        }
-      }
-
-      if (isGroup && !text.startsWith(".")) return
-
-      // ===== IMAGE DETECT =====
+      // ===== IMAGE DETECT (DIPINDAH KE ATAS ✅) =====
       const directImage = m.message?.imageMessage
       const quotedImage = quoted?.imageMessage
       const isImage = !!(directImage || quotedImage)
@@ -203,6 +189,21 @@ async function startBot() {
           console.log("Download gambar error:", e.message)
         }
       }
+
+      // ===== AUTOPILOT CHECK (SEKARANG AMAN ✅) =====
+      if (isGroup) {
+        try {
+          const autopilot = require("./plugins/autopilot")
+          if (autopilot?.check) {
+            const blocked = await autopilot.check(sock, m, { text, sender, from, imageBuffer })
+            if (blocked) return
+          }
+        } catch (e) {
+          console.log("Autopilot load error:", e.message)
+        }
+      }
+
+      if (isGroup && !text.startsWith(".")) return
 
       // ===== BRAIN =====
       let res = null
@@ -274,7 +275,7 @@ async function startBot() {
         })
       }
 
-      // ===== AUTO AI PRIVATE (SUPPORT VISION) =====
+      // ===== AUTO AI PRIVATE =====
       if (!isGroup) {
         if (!text && !imageBuffer) return
         if (text.startsWith(".")) return
@@ -308,6 +309,7 @@ async function startBot() {
           if (imageBuffer) {
             const base64 = imageBuffer.toString("base64")
             const mime = directImage?.mimetype || quotedImage?.mimetype || "image/jpeg"
+
             userContent.push({
               type: "image_url",
               image_url: {
@@ -332,10 +334,7 @@ async function startBot() {
             messages: [
               { role: "system", content: systemPrompt },
               ...history,
-              {
-                role: "user",
-                content: userContent
-              }
+              { role: "user", content: userContent }
             ]
           })
 
