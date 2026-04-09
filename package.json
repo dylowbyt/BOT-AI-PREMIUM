@@ -1,0 +1,21 @@
+{
+  "name": "wa-ai-bot",
+  "version": "1.0.5",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.6.0",
+    "axios": "^1.6.0",
+    "openai": "^4.0.0",
+    "yt-search": "^2.10.4",
+    "qrcode": "^1.5.4",
+    "sharp": "^0.33.0",
+    "form-data": "^4.0.0",
+    "pino": "^8.0.0",
+    "dotenv": "^16.4.5",
+    "ffmpeg-static": "^5.2.0"
+  }
+}
