@@ -1,0 +1,15 @@
+const axios = require("axios")
+
+module.exports = {
+  name: "ytsearch",
+  async run(sock, m, args) {
+    const q = args.join(" ")
+    const { data } = await axios.get(`https://api.popcat.xyz/ytsearch?q=${q}`)
+
+    let txt = data.map((v, i) =>
+      `${i+1}. ${v.title}\n${v.url}`
+    ).join("\n\n")
+
+    sock.sendMessage(m.key.remoteJid, { text: txt })
+  }
+}

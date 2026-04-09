@@ -1,0 +1,24 @@
+import axios from "axios"
+
+export default {
+  name: "ytdl",
+  command: ["ytmp4", "ytvideo"],
+  category: "downloader",
+  async execute({ sock, m, text }) {
+    if (!text) return m.reply("Masukkan link YouTube!")
+
+    try {
+      const api = `https://api.y2mate.is/v1/ytmp4?url=${text}`
+
+      const { data } = await axios.get(api)
+
+      await sock.sendMessage(m.chat, {
+        video: { url: data.link },
+        caption: data.title
+      }, { quoted: m })
+
+    } catch {
+      m.reply("Error download video")
+    }
+  }
+}
