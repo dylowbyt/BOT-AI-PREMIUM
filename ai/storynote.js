@@ -1,50 +1,55 @@
 /**
- * storynote.js — Helper StorynoteAI (FIXED)
- * Auto-buat project lalu generate gambar + debug 403
+ * storynote.js — Helper StorynoteAI
+ * Auto-buat project jika belum ada, lalu generate gambar.
  */
 
 const axios = require("axios")
+const fs    = require("fs")
+const path  = require("path")
 
-const API_KEY  = process.env.STORYNOTE_API_KEY
-const BASE_URL = process.env.STORYNOTE_BASE_URL || "https://api.storynote.ai/v1"
+const API_KEY      = process.env.STORYNOTE_API_KEY
+const CACHE_PATH   = path.resolve(__dirname, "../data/storynote_project.json")
+const BASE_URL     = process.env.STORYNOTE_BASE_URL || "https://api.storynote.ai/v1"
 
 function getHeaders() {
   return {
-    Authorization: `Bearer ${API_KEY}`,
-    "Content-Type": "application/json",
-    Accept: "application/json",
-    Origin: "https://app.storynote.ai",
-    Referer: "https://app.storynote.ai/"
+    Authorization:  `Bearer ${API_KEY}`,
+    "Content-Type": "application/json"
   }
 }
 
+function loadCachedProjectId() {
+  try {
+    if (fs.existsSync(CACHE_PATH)) {
+      return JSON.parse(fs.readFileSync(CACHE_PATH, "utf8")).projectId || null
+    }
+  } catch {}
+  return null
+}
+
+function saveProjectId(projectId) {
+  fs.mkdirSync(path.dirname(CACHE_PATH), { recursive: true })
+  fs.writeFileSync(CACHE_PATH, JSON.stringify({ projectId }))
+}
+
 async function getProjectId() {
+  const cached = loadCachedProjectId()
+  if (cached) return cached
+
   const res = await axios.post(
     `${BASE_URL}/projects`,
     { name: "WA Bot Image Gen" },
     { headers: getHeaders() }
   )
 
-  const projectId =
-    res.data?.project?._id ||
-    res.data?.id ||
-    res.data?.projectId ||
-    res.data?.data?.id
+  const projectId = res.data?.project?._id || res.data?.id || res.data?.projectId || res.data?.data?.id
+  if (!projectId) throw new Error("Gagal mendapat projectId dari StorynoteAI")
 
-  if (!projectId) {
-    console.log("RESP:", res.data)
-    throw new Error("Gagal mendapat projectId")
-  }
-
+  saveProjectId(projectId)
   return projectId
 }
 
-async function generateImage({
-  prompt,
-  modelId = "default",
-  aspectRatio = "1:1",
-  maxWaitMs = 90000
-}) {
+async function generateImage({ prompt, modelId, aspectRatio = "1:1", maxWaitMs = 90000 }) {
   if (!API_KEY) {
     throw new Error("STORYNOTE_API_KEY belum diset")
   }
@@ -52,63 +57,24 @@ async function generateImage({
   const projectId = await getProjectId()
   const headers   = getHeaders()
 
-  let createRes
+  const createRes = await axios.post(
+    `${BASE_URL}/projects/${projectId}/image`,
+    { directPrompt: prompt, modelId, aspectRatio, numImages: 1 },
+    { headers }
+  )
 
-  try {
-    createRes = await axios.post(
-      `${BASE_URL}/projects/${projectId}/image`,
-      {
-        directPrompt: prompt,
-        modelId,
-        aspectRatio,
-        numImages: 1
-      },
-      {
-        headers,
-        validateStatus: () => true // penting untuk debug
-      }
-    )
-  } catch (err) {
-    console.log("REQUEST ERROR:", err.message)
-    throw err
-  }
+  const jobId = createRes.data.jobId || createRes.data.jobIds?.[0]
+  if (!jobId) throw new Error("Tidak mendapat jobId dari StorynoteAI")
 
-  // 🔍 DEBUG RESPONSE
-  if (createRes.status !== 200 && createRes.status !== 201) {
-    console.log("❌ STATUS:", createRes.status)
-    console.log("❌ RESPONSE:", JSON.stringify(createRes.data, null, 2))
-    throw new Error(`Storynote error ${createRes.status}`)
-  }
-
-  const jobId =
-    createRes.data?.jobId ||
-    createRes.data?.jobIds?.[0]
-
-  if (!jobId) {
-    console.log("RESP:", createRes.data)
-    throw new Error("Tidak mendapat jobId")
-  }
-
-  const interval = 3000
-  const maxTries = Math.ceil(maxWaitMs / interval)
+  const interval  = 3000
+  const maxTries  = Math.ceil(maxWaitMs / interval)
 
   for (let i = 0; i < maxTries; i++) {
     await new Promise(r => setTimeout(r, interval))
-
-    const poll = await axios.get(
-      `${BASE_URL}/jobs/${jobId}`,
-      { headers }
-    )
-
-    const job = poll.data
-
-    if (job.status === "completed" && job.imageUrl) {
-      return job.imageUrl
-    }
-
-    if (job.status === "failed") {
-      throw new Error("Generate gagal: " + (job.error || "unknown"))
-    }
+    const poll = await axios.get(`${BASE_URL}/jobs/${jobId}`, { headers })
+    const job  = poll.data
+    if (job.status === "completed" && job.imageUrl) return job.imageUrl
+    if (job.status === "failed") throw new Error("Generate gagal: " + (job.error || "unknown"))
   }
 
   throw new Error("Timeout: gambar tidak selesai")
