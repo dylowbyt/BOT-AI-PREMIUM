@@ -6,6 +6,7 @@
  *   .buy basic/medium/pro → buat transaksi Midtrans otomatis
  *   .cekbayar <ref>       → cek status bayar manual
  *   .addtoken <no> <jml>  → admin: tambah token manual
+ *   .tutorial             → panduan nanoedit
  *
  * ENV yang dibutuhkan:
  *   MIDTRANS_SERVER_KEY   — Server key dari dashboard Midtrans
@@ -96,7 +97,7 @@ async function fetchMidtransStatus(reference) {
 
 module.exports = {
   name:  "premium",
-  alias: ["buy", "token", "topup", "addtoken", "cekbayar"],
+  alias: ["buy", "token", "topup", "addtoken", "cekbayar", "tutorial"],
 
   async run(sock, m, args) {
     const from    = m.key.remoteJid
@@ -108,45 +109,45 @@ module.exports = {
     const command = rawText.slice(1).split(" ")[0].toLowerCase()
 
     // ─── .tutorial ──────────────────────────────────────────────
-if (command === "tutorial") {
-  return sock.sendMessage(from, {
-    text:
-      `📖 *TUTORIAL NANO BANANA EDIT*\n\n` +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `🎯 *TUJUAN*\n` +
-      `Fitur ini digunakan untuk *mengedit foto dengan AI* sesuai instruksi yang kamu kirim.\n\n` +
+    if (command === "tutorial") {
+      return sock.sendMessage(from, {
+        text:
+          `📖 *TUTORIAL NANO BANANA EDIT*\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `🎯 *TUJUAN*\n` +
+          `Fitur ini digunakan untuk *mengedit foto dengan AI* sesuai instruksi yang kamu kirim.\n\n` +
 
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `⚙️ *CARANYA*\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `⚙️ *CARANYA*\n\n` +
 
-      `🖼️ *1. Edit 1 Foto*\n` +
-      `Kirim 1 foto + caption:\n` +
-      `👉 *.nanoedit <instruksi>*\n\n` +
-      `Contoh:\n` +
-      `👉 .nanoedit ubah jadi anime\n\n` +
+          `🖼️ *1. Edit 1 Foto*\n` +
+          `Kirim 1 foto + caption:\n` +
+          `👉 *.nanoedit <instruksi>*\n\n` +
+          `Contoh:\n` +
+          `👉 .nanoedit ubah jadi anime\n\n` +
 
-      `━━━━━━━━━━━━━━━━━━━━\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
 
-      `🖼️ *2. Edit 2 Foto (Gabung / Referensi)*\n` +
-      `• Kirim foto 1 dengan caption:\n` +
-      `👉 *.nanoedit <instruksi>*\n` +
-      `• Lalu *reply* ke pesan yang ada foto ke-2\n\n` +
+          `🖼️ *2. Edit 2 Foto (Gabung / Referensi)*\n` +
+          `• Kirim foto 1 dengan caption:\n` +
+          `👉 *.nanoedit <instruksi>*\n` +
+          `• Lalu *reply* ke pesan yang ada foto ke-2\n\n` +
 
-      `Contoh:\n` +
-      `👉 Kirim foto kamu\n` +
-      `👉 Reply ke foto lain + caption:\n` +
-      `👉 .nanoedit gabungkan jadi satu gambar\n\n` +
+          `Contoh:\n` +
+          `👉 Kirim foto kamu\n` +
+          `👉 Reply ke foto lain + caption:\n` +
+          `👉 .nanoedit gabungkan jadi satu gambar\n\n` +
 
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `💡 *TIPS*\n` +
-      `• Gunakan instruksi yang jelas\n` +
-      `• Bisa ubah style, background, objek, dll\n` +
-      `• Semakin detail, hasil makin bagus\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `💡 *TIPS*\n` +
+          `• Gunakan instruksi yang jelas\n` +
+          `• Bisa ubah style, background, objek, dll\n` +
+          `• Semakin detail, hasil makin bagus\n\n` +
 
-      `🚀 Selamat mencoba!`
-  })
-}
-    
+          `🚀 Selamat mencoba!`
+      })
+    }
+
     // ─── .premium ──────────────────────────────────────────────
     if (command === "premium") {
       const tokens = getTokens(sender)
@@ -197,7 +198,7 @@ if (command === "tutorial") {
       }
 
       const selected  = PACKAGES[pkg]
-      const userPhone = sender.replace("@s.whatsapp.net", "")
+      const userPhone = sender.replace("@s.whatsapp.net", "").replace(/:\d+$/, "")
 
       if (!MIDTRANS_SERVER_KEY) {
         return sock.sendMessage(from, {
@@ -318,8 +319,8 @@ if (command === "tutorial") {
 
     // ─── .addtoken <nomor> <jumlah> (admin only) ───────────────
     if (command === "addtoken") {
-      const adminId = ADMIN_NUMBER + "@s.whatsapp.net"
-      if (sender !== adminId) {
+      const senderNumber = sender.replace(/@s\.whatsapp\.net$/, "").replace(/:\d+$/, "")
+      if (senderNumber !== ADMIN_NUMBER) {
         return sock.sendMessage(from, { text: "❌ Perintah ini hanya untuk admin." })
       }
 
