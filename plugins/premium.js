@@ -6,7 +6,12 @@
  *   .buy basic/medium/pro → buat transaksi Midtrans otomatis
  *   .cekbayar <ref>       → cek status bayar manual
  *   .addtoken <no> <jml>  → admin: tambah token manual
- *   .tutorial             → panduan penggunaan nano edit
+ *
+ * ENV yang dibutuhkan:
+ *   MIDTRANS_SERVER_KEY   — Server key dari dashboard Midtrans
+ *   MIDTRANS_SANDBOX      — "true" untuk sandbox/testing, "false" untuk live
+ *   ADMIN_NUMBER          — Nomor WA admin (format: 628xxx)
+ *   PAYMENT_INFO          — (opsional) Pesan manual jika Midtrans belum diset
  */
 
 const axios  = require("axios")
@@ -19,10 +24,7 @@ const SNAP_BASE_URL       = IS_SANDBOX
   ? "https://app.sandbox.midtrans.com/snap/v1"
   : "https://app.midtrans.com/snap/v1"
 
-/**
- * 🔥 ADMIN FIX (ONLY THIS CHANGED)
- */
-const ADMIN_NUMBER = "083966344919"
+const ADMIN_NUMBER = process.env.ADMIN_NUMBER || "6281234567890"
 
 const PACKAGES = {
   basic:  { tokens: 20,  price: 10000, label: "Basic"  },
@@ -41,11 +43,6 @@ function makeRef(pkg) {
 function midtransAuthHeader() {
   const encoded = Buffer.from(MIDTRANS_SERVER_KEY + ":").toString("base64")
   return `Basic ${encoded}`
-}
-
-function normalizeNumber(num) {
-  if (!num) return ""
-  return num.toString().replace(/[^0-9]/g, "").replace(/^62/, "0")
 }
 
 async function createMidtransTransaction({ reference, pkg, userPhone }) {
@@ -99,59 +96,57 @@ async function fetchMidtransStatus(reference) {
 
 module.exports = {
   name:  "premium",
-  alias: ["buy", "token", "topup", "addtoken", "cekbayar", "tutorial"],
+  alias: ["buy", "token", "topup", "addtoken", "cekbayar"],
 
   async run(sock, m, args) {
     const from    = m.key.remoteJid
     const sender  = m.key.participant || m.key.remoteJid
-
     const rawText = (
       m.message?.conversation ||
       m.message?.extendedTextMessage?.text || ""
     ).trim()
-
     const command = rawText.slice(1).split(" ")[0].toLowerCase()
 
     // ─── .tutorial ──────────────────────────────────────────────
-    if (command === "tutorial") {
-      return sock.sendMessage(from, {
-        text:
-          `📖 *TUTORIAL NANO BANANA EDIT*\n\n` +
-          `━━━━━━━━━━━━━━━━━━━━\n` +
-          `🎯 *TUJUAN*\n` +
-          `Fitur ini digunakan untuk *mengedit foto dengan AI* sesuai instruksi yang kamu kirim.\n\n` +
+if (command === "tutorial") {
+  return sock.sendMessage(from, {
+    text:
+      `📖 *TUTORIAL NANO BANANA EDIT*\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `🎯 *TUJUAN*\n` +
+      `Fitur ini digunakan untuk *mengedit foto dengan AI* sesuai instruksi yang kamu kirim.\n\n` +
 
-          `━━━━━━━━━━━━━━━━━━━━\n` +
-          `⚙️ *CARANYA*\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `⚙️ *CARANYA*\n\n` +
 
-          `🖼️ *1. Edit 1 Foto*\n` +
-          `Kirim 1 foto + caption:\n` +
-          `👉 *.nanoedit <instruksi>*\n\n` +
-          `Contoh:\n` +
-          `👉 .nanoedit ubah jadi anime\n\n` +
+      `🖼️ *1. Edit 1 Foto*\n` +
+      `Kirim 1 foto + caption:\n` +
+      `👉 *.nanoedit <instruksi>*\n\n` +
+      `Contoh:\n` +
+      `👉 .nanoedit ubah jadi anime\n\n` +
 
-          `━━━━━━━━━━━━━━━━━━━━\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
 
-          `🖼️ *2. Edit 2 Foto (Gabung / Referensi)*\n` +
-          `• Kirim foto 1 dengan caption:\n` +
-          `👉 *.nanoedit <instruksi>*\n` +
-          `• Lalu *reply* ke pesan yang ada foto ke-2\n\n` +
+      `🖼️ *2. Edit 2 Foto (Gabung / Referensi)*\n` +
+      `• Kirim foto 1 dengan caption:\n` +
+      `👉 *.nanoedit <instruksi>*\n` +
+      `• Lalu *reply* ke pesan yang ada foto ke-2\n\n` +
 
-          `Contoh:\n` +
-          `👉 Kirim foto kamu\n` +
-          `👉 Reply ke foto lain + caption:\n` +
-          `👉 .nanoedit gabungkan jadi satu gambar\n\n` +
+      `Contoh:\n` +
+      `👉 Kirim foto kamu\n` +
+      `👉 Reply ke foto lain + caption:\n` +
+      `👉 .nanoedit gabungkan jadi satu gambar\n\n` +
 
-          `━━━━━━━━━━━━━━━━━━━━\n` +
-          `💡 *TIPS*\n` +
-          `• Gunakan instruksi yang jelas\n` +
-          `• Bisa ubah style, background, objek, dll\n` +
-          `• Semakin detail, hasil makin bagus\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `💡 *TIPS*\n` +
+      `• Gunakan instruksi yang jelas\n` +
+      `• Bisa ubah style, background, objek, dll\n` +
+      `• Semakin detail, hasil makin bagus\n\n` +
 
-          `🚀 Selamat mencoba!`
-      })
-    }
-
+      `🚀 Selamat mencoba!`
+  })
+}
+    
     // ─── .premium ──────────────────────────────────────────────
     if (command === "premium") {
       const tokens = getTokens(sender)
@@ -165,121 +160,196 @@ module.exports = {
           `2️⃣  *Medium* — 50 token → ${formatRupiah(25000)}\n` +
           `3️⃣  *Pro*    — 100 token → ${formatRupiah(50000)}\n\n` +
           `━━━━━━━━━━━━━━━━━━━━\n` +
+          `🖼️ *GENERATE GAMBAR:*\n` +
+          `⚡ .img         — 1 token\n` +
+          `⚖️ .img-hd      — 2 token\n` +
+          `👑 .img-pro     — 3 token\n` +
+          `🍌 .nano        — 3 token   (Nano Banana Basic)\n` +
+          `🍌 .nanoedit    — 3 token   (Nano Banana Edit)\n` +
+          `🍌 .nano2       — 4 token   (Nano Banana 2)\n` +
+          `🍌 .nanopro     — 8 token   (Nano Banana Pro)\n` +
+          `🤖 .gptimg      — 8 token   (GPT Image 1.5)\n` +
+          `🧠 .gpt4o       — 10 token  (GPT-4o Image)\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `🎬 *GENERATE VIDEO:*\n` +
+          `🌀 .sora2         — 10 token  (OpenAI Sora 2)\n` +
+          `⚡ .runway-turbo  — 8 token   (Runway Gen3 Turbo)\n` +
+          `🎞️ .runway        — 12 token  (Runway Gen3)\n` +
+          `🎬 .veo3          — 16 token  (Google Veo 3)\n` +
+          `🎥 .veo31         — 18 token  (Google Veo 3.1)\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
           `📝 Ketik: *.buy basic* / *.buy medium* / *.buy pro*`
       })
     }
 
-    // ─── .buy ──────────────────────────────────────────
+    // ─── .buy <paket> ──────────────────────────────────────────
     if (command === "buy") {
       const pkg = args[0]?.toLowerCase()
 
-      if (!PACKAGES[pkg]) {
+      if (!pkg || !PACKAGES[pkg]) {
         return sock.sendMessage(from, {
           text:
             `❌ *Paket tidak valid!*\n\n` +
-            `• *.buy basic*\n• *.buy medium*\n• *.buy pro*`
+            `• *.buy basic*  → 20 token / ${formatRupiah(10000)}\n` +
+            `• *.buy medium* → 50 token / ${formatRupiah(25000)}\n` +
+            `• *.buy pro*    → 100 token / ${formatRupiah(50000)}`
         })
       }
 
       const selected  = PACKAGES[pkg]
       const userPhone = sender.replace("@s.whatsapp.net", "")
 
+      if (!MIDTRANS_SERVER_KEY) {
+        return sock.sendMessage(from, {
+          text:
+            `💎 *Paket ${selected.label}*\n\n` +
+            `🪙 Token: *${selected.tokens}*\n` +
+            `💰 Harga: *${formatRupiah(selected.price)}*\n\n` +
+            `${process.env.PAYMENT_INFO || "Hubungi admin untuk pembayaran."}\n\n` +
+            `📞 Admin: wa.me/${ADMIN_NUMBER}`
+        })
+      }
+
+      await sock.sendMessage(from, { text: "⏳ Membuat link pembayaran Midtrans..." })
+
       try {
         const reference = makeRef(pkg)
-
-        const trx = await createMidtransTransaction({
-          reference,
-          pkg,
-          userPhone
-        })
+        const trx       = await createMidtransTransaction({ reference, pkg, userPhone })
+        const payUrl    = trx.redirect_url
+        const expiredAt = new Date(Date.now() + 2 * 60 * 60 * 1000)
+          .toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })
 
         addPendingPayment({
           reference,
-          userId: sender,
-          tokens: selected.tokens,
-          amount: selected.price,
+          userId:    sender,
+          tokens:    selected.tokens,
+          amount:    selected.price,
           expiredAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
         })
 
         return sock.sendMessage(from, {
           text:
-            `💳 LINK BAYAR:\n${trx.redirect_url}\n\nREF: ${reference}`
+            `💎 *PEMBAYARAN PAKET ${selected.label.toUpperCase()}*\n\n` +
+            `🪙 Token: *${selected.tokens} token*\n` +
+            `💰 Jumlah: *${formatRupiah(selected.price)}*\n` +
+            `🔖 Referensi: \`${reference}\`\n\n` +
+            `━━━━━━━━━━━━━━━━━━━━\n` +
+            `💳 *Cara Bayar:*\n\n` +
+            `🔗 Klik link berikut untuk bayar:\n${payUrl}\n\n` +
+            `📱 Tersedia: QRIS, Transfer Bank, GoPay, OVO, Dana, dll\n\n` +
+            `⏰ Berlaku sampai: ${expiredAt} WIB\n\n` +
+            `━━━━━━━━━━━━━━━━━━━━\n` +
+            `✅ Token otomatis masuk setelah bayar!\n` +
+            `📲 Cek manual: *.cekbayar ${reference}*`
         })
 
       } catch (err) {
+        console.log("[premium] Midtrans error:", err?.response?.data || err?.message)
         return sock.sendMessage(from, {
-          text: `❌ Error: ${err?.message}`
+          text:
+            `❌ Gagal membuat link pembayaran.\n\n` +
+            `Coba lagi atau hubungi admin:\n` +
+            `wa.me/${ADMIN_NUMBER}\n\n` +
+            `Error: ${err?.response?.data?.error_messages?.[0] || err?.message}`
         })
       }
     }
 
-    // ─── .cekbayar ──────────────────────────────────────
+    // ─── .cekbayar <ref> ──────────────────────────────────────
     if (command === "cekbayar") {
       const reference = args[0]
+      if (!reference) {
+        return sock.sendMessage(from, {
+          text: `⚠️ Format: *.cekbayar <referensi>*\nContoh: *.cekbayar TKN-BASIC-1234567890*`
+        })
+      }
 
       const local = getByReference(reference)
       if (!local) {
-        return sock.sendMessage(from, { text: "❌ Tidak ditemukan" })
+        return sock.sendMessage(from, { text: `❌ Referensi *${reference}* tidak ditemukan.` })
+      }
+
+      if (local.status === "PAID") {
+        return sock.sendMessage(from, {
+          text: `✅ Pembayaran *${reference}* sudah dikonfirmasi!\n🪙 Token: *${getTokens(sender)}*`
+        })
       }
 
       try {
+        await sock.sendMessage(from, { text: "🔍 Mengecek status pembayaran Midtrans..." })
         const trx = await fetchMidtransStatus(reference)
 
-        if (["settlement", "capture"].includes(trx?.transaction_status)) {
+        const settlementStatuses = ["settlement", "capture"]
+
+        if (settlementStatuses.includes(trx?.transaction_status)) {
           updateStatus(reference, "PAID")
           const newTotal = addTokens(local.userId, local.tokens)
-
           return sock.sendMessage(from, {
             text:
-              `✅ BERHASIL\n\n` +
-              `+${local.tokens} token\n` +
-              `Total: ${newTotal}`
+              `✅ *Pembayaran Diterima!*\n\n` +
+              `➕ Token ditambahkan: *${local.tokens}*\n` +
+              `🪙 Total token: *${newTotal}*\n\n` +
+              `Ketik *.img <prompt>* untuk mulai generate!`
           })
         }
 
+        const statusLabel = {
+          pending: "⏳ Menunggu pembayaran",
+          expire:  "❌ Kadaluarsa",
+          cancel:  "❌ Dibatalkan",
+          deny:    "❌ Ditolak"
+        }[trx?.transaction_status] || trx?.transaction_status
+
         return sock.sendMessage(from, {
-          text: `Status: ${trx?.transaction_status}`
+          text:
+            `📋 *Status Pembayaran*\n\n` +
+            `🔖 Ref: \`${reference}\`\n` +
+            `💰 Jumlah: *${formatRupiah(local.amount)}*\n` +
+            `📊 Status: *${statusLabel}*\n\n` +
+            `Bot akan otomatis menambah token saat pembayaran masuk.`
         })
 
       } catch (err) {
         return sock.sendMessage(from, {
-          text: "❌ Error cek"
+          text: `❌ Gagal cek status: ${err?.message}`
         })
       }
     }
 
-    // ─── .addtoken (ADMIN FIX ONLY) ─────────────────────
+    // ─── .addtoken <nomor> <jumlah> (admin only) ───────────────
     if (command === "addtoken") {
-
-      const senderNum = normalizeNumber(sender)
-      const adminNum   = normalizeNumber(ADMIN_NUMBER)
-      const isAdmin    = senderNum === adminNum
-
-      if (!isAdmin) {
-        return sock.sendMessage(from, {
-          text: "❌ Admin only."
-        })
+      const adminId = ADMIN_NUMBER + "@s.whatsapp.net"
+      if (sender !== adminId) {
+        return sock.sendMessage(from, { text: "❌ Perintah ini hanya untuk admin." })
       }
 
       const targetNum = args[0]
       const amount    = parseInt(args[1])
 
-      if (!targetNum || isNaN(amount)) {
+      if (!targetNum || isNaN(amount) || amount <= 0) {
         return sock.sendMessage(from, {
           text: `⚠️ Format: *.addtoken 628xxx <jumlah>*`
         })
       }
 
-      const userId = targetNum.replace(/^0/, "62") + "@s.whatsapp.net"
+      const userId   = targetNum.replace(/^0/, "62") + "@s.whatsapp.net"
       const newTotal = addTokens(userId, amount)
 
-      return sock.sendMessage(from, {
+      await sock.sendMessage(from, {
         text:
-          `✅ TOKEN DITAMBAHKAN\n\n` +
+          `✅ *Token ditambahkan!*\n\n` +
           `👤 User: ${targetNum}\n` +
-          `➕ +${amount}\n` +
-          `🪙 Total: ${newTotal}`
+          `➕ Ditambah: ${amount} token\n` +
+          `🪙 Total: ${newTotal} token`
       })
+
+      await sock.sendMessage(userId, {
+        text:
+          `🎉 *Token kamu telah diisi!*\n\n` +
+          `➕ Ditambahkan: *${amount} token*\n` +
+          `🪙 Total token: *${newTotal}*\n\n` +
+          `Ketik *.img <prompt>* untuk mulai! 🖼️`
+      }).catch(() => {})
     }
   }
 }
