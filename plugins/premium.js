@@ -112,16 +112,32 @@ module.exports = {
       const tokens = getTokens(sender)
       return sock.sendMessage(from, {
         text:
-          `💎 *PREMIUM IMAGE GENERATOR*\n\n` +
+          `💎 *PREMIUM AI GENERATOR*\n\n` +
           `🪙 Token kamu: *${tokens} token*\n\n` +
           `━━━━━━━━━━━━━━━━━━━━\n` +
           `📦 *PILIH PAKET:*\n\n` +
-          `1️⃣  *Basic*  — 20 gambar → ${formatRupiah(10000)}\n` +
-          `2️⃣  *Medium* — 50 gambar → ${formatRupiah(25000)}\n` +
-          `3️⃣  *Pro*    — 100 gambar → ${formatRupiah(50000)}\n\n` +
+          `1️⃣  *Basic*  — 20 token → ${formatRupiah(10000)}\n` +
+          `2️⃣  *Medium* — 50 token → ${formatRupiah(25000)}\n` +
+          `3️⃣  *Pro*    — 100 token → ${formatRupiah(50000)}\n\n` +
           `━━━━━━━━━━━━━━━━━━━━\n` +
-          `✨ *Bonus semua paket:*\n` +
-          `⚡ .img (1 token) · ⚖️ .img-hd (2 token) · 👑 .img-pro (3 token)\n\n` +
+          `🖼️ *GENERATE GAMBAR:*\n` +
+          `⚡ .img         — 1 token\n` +
+          `⚖️ .img-hd      — 2 token\n` +
+          `👑 .img-pro     — 3 token\n` +
+          `🍌 .nano        — 3 token   (Nano Banana Basic)\n` +
+          `🍌 .nanoedit    — 3 token   (Nano Banana Edit)\n` +
+          `🍌 .nano2       — 4 token   (Nano Banana 2)\n` +
+          `🍌 .nanopro     — 8 token   (Nano Banana Pro)\n` +
+          `🤖 .gptimg      — 8 token   (GPT Image 1.5)\n` +
+          `🧠 .gpt4o       — 10 token  (GPT-4o Image)\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `🎬 *GENERATE VIDEO:*\n` +
+          `🌀 .sora2         — 10 token  (OpenAI Sora 2)\n` +
+          `⚡ .runway-turbo  — 8 token   (Runway Gen3 Turbo)\n` +
+          `🎞️ .runway        — 12 token  (Runway Gen3)\n` +
+          `🎬 .veo3          — 16 token  (Google Veo 3)\n` +
+          `🎥 .veo31         — 18 token  (Google Veo 3.1)\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
           `📝 Ketik: *.buy basic* / *.buy medium* / *.buy pro*`
       })
     }
