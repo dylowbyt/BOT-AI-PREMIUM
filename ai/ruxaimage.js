@@ -11,7 +11,7 @@ const path  = require("path")
 const os    = require("os")
 
 const RUXA_API_KEY = process.env.RUXA_API_KEY
-const BASE_URL     = process.env.RUXA_BASE_URL || "https://ruxa.ai/v1"
+const BASE_URL     = process.env.RUXA_BASE_URL || "https://api.ruxa.ai/v1"
 
 function getHeaders(contentType = "application/json") {
   return {
