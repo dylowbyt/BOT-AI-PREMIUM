@@ -1,12 +1,5 @@
 /**
- * runway.js — Plugin generate video Runway AI (Premium)
- *
- * Commands:
- *   .runway <prompt>      → Generate video Runway Gen3 (12 token)
- *   .runway-turbo <prompt> → Generate video Runway Gen3 Turbo (8 token)
- *
- * ENV yang dibutuhkan:
- *   AIVIDEO_API_KEY  — API Key dari aivideoapi.com/dashboard
+ * runway.js — Plugin generate video Runway AI (Premium) [FIX + CUSTOM RATIO]
  */
 
 const { getTokens, addTokens } = require("../ai/tokendb")
@@ -26,11 +19,48 @@ async function handleRunway(sock, m, args, command) {
     return sock.sendMessage(from, {
       text:
         `${model.emoji} *${model.label}*\n\n` +
-        `📝 Cara pakai: *.${command === "runwayturbo" ? "runway-turbo" : command} <deskripsi video>*\n\n` +
+        `📝 Format:\n` +
+        `*.${command === "runwayturbo" ? "runway-turbo" : command} <prompt> | <ratio>*\n\n` +
         `Contoh:\n` +
-        `*.${command === "runwayturbo" ? "runway-turbo" : command} cinematic drone shot over mountain valley at sunrise*\n\n` +
-        `🪙 Biaya: *${model.cost} token*\n` +
-        `💰 Saldo kamu: *${getTokens(sender)} token*`
+        `*.${command === "runwayturbo" ? "runway-turbo" : command} cinematic city night | 9:16*\n\n` +
+        `📐 Ratio tersedia:\n` +
+        `• 16:9 (landscape)\n` +
+        `• 9:16 (portrait)\n` +
+        `• 1:1 (square)\n` +
+        `• 4:3\n` +
+        `• 3:4\n\n` +
+        `🪙 Biaya: *${model.cost} token*`
+    })
+  }
+
+  // 🔥 PARSE PROMPT + RATIO
+  let text = args.join(" ").trim()
+
+  let prompt = text
+  let aspect_ratio = "16:9"
+
+  if (text.includes("|")) {
+    const parts = text.split("|")
+    prompt = parts[0].trim()
+    aspect_ratio = parts[1].trim()
+  }
+
+  // VALIDASI PROMPT
+  if (prompt.length < 10) {
+    return sock.sendMessage(from, {
+      text: `⚠️ Prompt terlalu pendek! Minimal 10 karakter.`
+    })
+  }
+
+  // VALIDASI RATIO
+  const validRatios = ["16:9", "9:16", "1:1", "4:3", "3:4"]
+
+  if (!validRatios.includes(aspect_ratio)) {
+    return sock.sendMessage(from, {
+      text:
+        `❌ Aspect ratio tidak valid!\n\n` +
+        `Gunakan:\n` +
+        `• 16:9\n• 9:16\n• 1:1\n• 4:3\n• 3:4`
     })
   }
 
@@ -40,47 +70,55 @@ async function handleRunway(sock, m, args, command) {
       text:
         `❌ *Token tidak cukup!*\n\n` +
         `🪙 Token kamu: *${tokens}*\n` +
-        `💸 Dibutuhkan: *${model.cost} token*\n\n` +
-        `Beli token: *.buy basic* / *.buy medium* / *.buy pro*`
+        `💸 Dibutuhkan: *${model.cost} token*`
     })
   }
 
-  const prompt = args.join(" ")
-
   await sock.sendMessage(from, {
     text:
-      `${model.emoji} *Generating video dengan ${model.label}...*\n\n` +
+      `${model.emoji} *Generating video (${model.label})...*\n\n` +
       `📝 Prompt: _${prompt}_\n` +
-      `🪙 Token terpakai: *${model.cost}*\n\n` +
-      `⏳ Mohon tunggu, proses ini bisa memakan waktu 1-3 menit...`
+      `📐 Ratio: *${aspect_ratio}*\n` +
+      `🪙 Token: *${model.cost}*\n\n` +
+      `⏳ Tunggu 1-3 menit...`
   })
 
+  // POTONG TOKEN
   addTokens(sender, -model.cost)
 
   try {
     const videoUrl = await generateVideo({
-      prompt,
-      modelKey: model.key
+      prompt: prompt,
+      model: model.key,
+      duration: 5,
+      aspect_ratio: aspect_ratio
     })
+
+    if (!videoUrl) throw new Error("Video URL kosong dari API")
 
     await sock.sendMessage(from, {
       video: { url: videoUrl },
       caption:
-        `✅ *Video siap!*\n\n` +
+        `✅ *Video berhasil dibuat!*\n\n` +
         `🤖 Model: *${model.label}*\n` +
-        `📝 Prompt: _${prompt}_\n` +
+        `📐 Ratio: *${aspect_ratio}*\n` +
         `🪙 Sisa token: *${getTokens(sender)}*`
     })
 
   } catch (err) {
     addTokens(sender, model.cost)
 
-    console.log(`[runway/${command}] Error:`, err?.response?.data || err?.message)
+    const apiError =
+      err?.response?.data?.error ||
+      err?.response?.data?.message ||
+      err?.message
+
+    console.log(`[runway/${command}] ERROR:`, err?.response?.data || err)
 
     await sock.sendMessage(from, {
       text:
         `❌ *Gagal generate video*\n\n` +
-        `Error: ${err?.message || "Unknown error"}\n\n` +
+        `📛 Error:\n${apiError}\n\n` +
         `🪙 Token dikembalikan: *${model.cost}*`
     })
   }
