@@ -12,26 +12,30 @@ const RUXA_API_KEY = process.env.RUXA_API_KEY
 const BASE_URL = "https://api.ruxa.ai/api/v1"
 
 // Mapping nama model dari videogen.js → nama model resmi Ruxa AI
-// Cek model yang aktif di akun kamu: https://ruxa.ai/dashboard
+// veo3 tidak tersedia di akun ini, dialihkan ke veo3.1
 const MODEL_MAP = {
-  "veo-3":   "veo3",
+  "veo-3":   "veo3.1",
   "veo-3.1": "veo3.1",
   "sora-2":  "sora-2"
 }
 
 // Input params per model (sesuai docs Ruxa AI)
 function buildInput(prompt, ruxaModel) {
-  const base = { prompt, aspect_ratio: "16:9" }
-
-  if (ruxaModel === "veo3" || ruxaModel === "veo3.1") {
-    return { ...base, seconds: "8", enhance_prompt: true, enable_upsample: false }
-  }
-
   if (ruxaModel === "sora-2") {
-    return { ...base, seconds: "8" }
+    return {
+      prompt,
+      seconds: "8"
+    }
   }
 
-  return base
+  // veo3 / veo3.1
+  return {
+    prompt,
+    seconds: "8",
+    aspect_ratio: "16:9",
+    enhance_prompt: true,
+    enable_upsample: false
+  }
 }
 
 /**
@@ -63,14 +67,10 @@ async function generateVideo({ prompt, modelKey }) {
   if (res.data?.code !== 200) {
     const msg = res.data?.message || ""
 
-    // Terjemahkan error Ruxa AI ke Bahasa Indonesia
     if (msg.includes("未找到支持模型") || msg.includes("渠道")) {
       throw new Error(
         `Model *${ruxaModel}* tidak tersedia di akun Ruxa AI kamu.\n\n` +
-        `💡 Solusi:\n` +
-        `• Cek akses model di: https://ruxa.ai/dashboard\n` +
-        `• Coba gunakan *.sora2* (lebih murah, 10 token)\n` +
-        `• Atau upgrade plan Ruxa AI kamu`
+        `💡 Cek akses model di: https://ruxa.ai/dashboard`
       )
     }
 
@@ -112,7 +112,7 @@ async function generateVideo({ prompt, modelKey }) {
     }
 
     if (state === "fail") {
-      throw new Error("Ruxa AI gagal membuat video. Coba prompt yang berbeda atau model lain")
+      throw new Error("Ruxa AI gagal membuat video. Coba prompt yang berbeda")
     }
   }
 
