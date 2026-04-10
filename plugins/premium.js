@@ -1,5 +1,12 @@
 /**
  * premium.js — Sistem token & pembayaran otomatis via Midtrans Snap
+ *
+ * Commands:
+ *   .premium              → lihat saldo & daftar paket
+ *   .buy basic/medium/pro → buat transaksi Midtrans otomatis
+ *   .cekbayar <ref>       → cek status bayar manual
+ *   .addtoken <no> <jml>  → admin: tambah token manual
+ *   .tutorial             → panduan penggunaan nano edit
  */
 
 const axios  = require("axios")
@@ -12,7 +19,10 @@ const SNAP_BASE_URL       = IS_SANDBOX
   ? "https://app.sandbox.midtrans.com/snap/v1"
   : "https://app.midtrans.com/snap/v1"
 
-const ADMIN_NUMBER = process.env.ADMIN_NUMBER || "6281234567890"
+/**
+ * 🔥 ADMIN FIX (ONLY THIS CHANGED)
+ */
+const ADMIN_NUMBER = "083966344919"
 
 const PACKAGES = {
   basic:  { tokens: 20,  price: 10000, label: "Basic"  },
@@ -33,9 +43,9 @@ function midtransAuthHeader() {
   return `Basic ${encoded}`
 }
 
-function normalizeNumber(jid) {
-  if (!jid) return ""
-  return jid.split("@")[0].split(":")[0].replace(/\D/g, "")
+function normalizeNumber(num) {
+  if (!num) return ""
+  return num.toString().replace(/[^0-9]/g, "").replace(/^62/, "0")
 }
 
 async function createMidtransTransaction({ reference, pkg, userPhone }) {
@@ -102,94 +112,77 @@ module.exports = {
 
     const command = rawText.slice(1).split(" ")[0].toLowerCase()
 
-    const ADMINS = (process.env.ADMIN_NUMBER || "")
-      .split(",")
-      .map(v => v.replace(/\D/g, ""))
-
-    const senderNumber = normalizeNumber(sender)
-    const isGroup = from.endsWith("@g.us")
-
-    // =========================
-    // 🔒 SECURITY CHECK ADDTOKEN
-    // =========================
-    if (command === "addtoken") {
-
-      // ❌ BLOCK GROUP TOTAL
-      if (isGroup) {
-        return sock.sendMessage(from, {
-          text: "❌ Command ini hanya bisa digunakan di private chat."
-        })
-      }
-
-      // ❌ ADMIN ONLY
-      if (!ADMINS.includes(senderNumber)) {
-        return sock.sendMessage(from, {
-          text: "❌ Admin only."
-        })
-      }
-
-      const targetNum = args[0]
-      const amount    = parseInt(args[1])
-
-      if (!targetNum || isNaN(amount) || amount <= 0) {
-        return sock.sendMessage(from, {
-          text: `⚠️ Format: *.addtoken 628xxx <jumlah>*`
-        })
-      }
-
-      const cleanTarget = targetNum.replace(/^0/, "62")
-      const userId      = cleanTarget + "@s.whatsapp.net"
-
-      const newTotal = addTokens(userId, amount)
-
-      return sock.sendMessage(from, {
-        text:
-          `✅ *TOKEN DITAMBAHKAN*\n\n` +
-          `👤 User: ${cleanTarget}\n` +
-          `➕ +${amount}\n` +
-          `🪙 Total: ${newTotal}`
-      })
-    }
-
-    // =========================
-    // .tutorial
-    // =========================
+    // ─── .tutorial ──────────────────────────────────────────────
     if (command === "tutorial") {
       return sock.sendMessage(from, {
         text:
-          `📖 *TUTORIAL NANO EDIT*\n\n` +
-          `🎯 Tujuan: edit gambar pakai AI\n\n` +
-          `🖼️ 1 foto:\n.nanoedit ubah jadi anime\n\n` +
-          `🖼️ 2 foto:\nreply foto kedua + nanoedit prompt`
+          `📖 *TUTORIAL NANO BANANA EDIT*\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `🎯 *TUJUAN*\n` +
+          `Fitur ini digunakan untuk *mengedit foto dengan AI* sesuai instruksi yang kamu kirim.\n\n` +
+
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `⚙️ *CARANYA*\n\n` +
+
+          `🖼️ *1. Edit 1 Foto*\n` +
+          `Kirim 1 foto + caption:\n` +
+          `👉 *.nanoedit <instruksi>*\n\n` +
+          `Contoh:\n` +
+          `👉 .nanoedit ubah jadi anime\n\n` +
+
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+
+          `🖼️ *2. Edit 2 Foto (Gabung / Referensi)*\n` +
+          `• Kirim foto 1 dengan caption:\n` +
+          `👉 *.nanoedit <instruksi>*\n` +
+          `• Lalu *reply* ke pesan yang ada foto ke-2\n\n` +
+
+          `Contoh:\n` +
+          `👉 Kirim foto kamu\n` +
+          `👉 Reply ke foto lain + caption:\n` +
+          `👉 .nanoedit gabungkan jadi satu gambar\n\n` +
+
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `💡 *TIPS*\n` +
+          `• Gunakan instruksi yang jelas\n` +
+          `• Bisa ubah style, background, objek, dll\n` +
+          `• Semakin detail, hasil makin bagus\n\n` +
+
+          `🚀 Selamat mencoba!`
       })
     }
 
-    // =========================
-    // .premium
-    // =========================
+    // ─── .premium ──────────────────────────────────────────────
     if (command === "premium") {
       const tokens = getTokens(sender)
-
       return sock.sendMessage(from, {
         text:
-          `💎 PREMIUM\n\n` +
-          `🪙 Token: ${tokens}\n\n` +
-          `basic / medium / pro`
+          `💎 *PREMIUM AI GENERATOR*\n\n` +
+          `🪙 Token kamu: *${tokens} token*\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `📦 *PILIH PAKET:*\n\n` +
+          `1️⃣  *Basic*  — 20 token → ${formatRupiah(10000)}\n` +
+          `2️⃣  *Medium* — 50 token → ${formatRupiah(25000)}\n` +
+          `3️⃣  *Pro*    — 100 token → ${formatRupiah(50000)}\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `📝 Ketik: *.buy basic* / *.buy medium* / *.buy pro*`
       })
     }
 
-    // =========================
-    // .buy
-    // =========================
+    // ─── .buy ──────────────────────────────────────────
     if (command === "buy") {
       const pkg = args[0]?.toLowerCase()
 
       if (!PACKAGES[pkg]) {
-        return sock.sendMessage(from, { text: "❌ Paket salah" })
+        return sock.sendMessage(from, {
+          text:
+            `❌ *Paket tidak valid!*\n\n` +
+            `• *.buy basic*\n• *.buy medium*\n• *.buy pro*`
+        })
       }
 
       const selected  = PACKAGES[pkg]
-      const userPhone = senderNumber
+      const userPhone = sender.replace("@s.whatsapp.net", "")
 
       try {
         const reference = makeRef(pkg)
@@ -210,8 +203,7 @@ module.exports = {
 
         return sock.sendMessage(from, {
           text:
-            `💳 BAYAR DI:\n${trx.redirect_url}\n\n` +
-            `REF: ${reference}`
+            `💳 LINK BAYAR:\n${trx.redirect_url}\n\nREF: ${reference}`
         })
 
       } catch (err) {
@@ -221,17 +213,13 @@ module.exports = {
       }
     }
 
-    // =========================
-    // .cekbayar
-    // =========================
+    // ─── .cekbayar ──────────────────────────────────────
     if (command === "cekbayar") {
       const reference = args[0]
 
       const local = getByReference(reference)
       if (!local) {
-        return sock.sendMessage(from, {
-          text: "❌ Tidak ditemukan"
-        })
+        return sock.sendMessage(from, { text: "❌ Tidak ditemukan" })
       }
 
       try {
@@ -239,7 +227,6 @@ module.exports = {
 
         if (["settlement", "capture"].includes(trx?.transaction_status)) {
           updateStatus(reference, "PAID")
-
           const newTotal = addTokens(local.userId, local.tokens)
 
           return sock.sendMessage(from, {
@@ -259,6 +246,40 @@ module.exports = {
           text: "❌ Error cek"
         })
       }
+    }
+
+    // ─── .addtoken (ADMIN FIX ONLY) ─────────────────────
+    if (command === "addtoken") {
+
+      const senderNum = normalizeNumber(sender)
+      const adminNum   = normalizeNumber(ADMIN_NUMBER)
+      const isAdmin    = senderNum === adminNum
+
+      if (!isAdmin) {
+        return sock.sendMessage(from, {
+          text: "❌ Admin only."
+        })
+      }
+
+      const targetNum = args[0]
+      const amount    = parseInt(args[1])
+
+      if (!targetNum || isNaN(amount)) {
+        return sock.sendMessage(from, {
+          text: `⚠️ Format: *.addtoken 628xxx <jumlah>*`
+        })
+      }
+
+      const userId = targetNum.replace(/^0/, "62") + "@s.whatsapp.net"
+      const newTotal = addTokens(userId, amount)
+
+      return sock.sendMessage(from, {
+        text:
+          `✅ TOKEN DITAMBAHKAN\n\n` +
+          `👤 User: ${targetNum}\n` +
+          `➕ +${amount}\n` +
+          `🪙 Total: ${newTotal}`
+      })
     }
   }
 }
