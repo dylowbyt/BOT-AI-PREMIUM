@@ -16,44 +16,55 @@ function getHeaders(extra = {}) {
   }
 }
 
+function extractImageUrl(data) {
+  const item = data?.data?.[0]
+  if (!item) return null
+  if (item.url)      return item.url
+  if (item.b64_json) return `data:image/png;base64,${item.b64_json}`
+  return null
+}
+
 /**
  * Generate gambar baru dari teks prompt
  * @param {{ prompt: string, model: string }} opts
- * @returns {Promise<string>} URL gambar
+ * @returns {Promise<string>} URL atau data:URI gambar
  */
 async function generateImage({ prompt, model }) {
   if (!API_KEY) throw new Error("RUXA_API_KEY belum diset di environment")
 
-  const res = await axios.post(
-    `${BASE_URL}/images/generations`,
-    {
-      model,
-      prompt,
-      n:    1,
-      size: "1024x1024",
-      response_format: "url"
-    },
-    {
-      headers: { ...getHeaders(), "Content-Type": "application/json" },
-      timeout: 120000
-    }
-  )
-
-  const item = res.data?.data?.[0]
-  if (!item) {
-    throw new Error("Tidak ada data gambar dari API: " + JSON.stringify(res.data).slice(0, 200))
+  let res
+  try {
+    res = await axios.post(
+      `${BASE_URL}/images/generations`,
+      { model, prompt, n: 1, size: "1024x1024" },
+      {
+        headers: { ...getHeaders(), "Content-Type": "application/json" },
+        timeout: 120000
+      }
+    )
+  } catch (err) {
+    const detail = err?.response?.data
+    const status = err?.response?.status
+    console.log(`[ruxaimage] generateImage error ${status}:`, JSON.stringify(detail).slice(0, 400))
+    throw new Error(
+      `API error ${status}: ` +
+      (detail?.error?.message || detail?.message || JSON.stringify(detail).slice(0, 200))
+    )
   }
 
-  if (item.url)      return item.url
-  if (item.b64_json) return `data:image/png;base64,${item.b64_json}`
+  const url = extractImageUrl(res.data)
+  if (!url) {
+    console.log("[ruxaimage] generateImage unknown response:", JSON.stringify(res.data).slice(0, 400))
+    throw new Error("Format respon tidak dikenali: " + JSON.stringify(res.data).slice(0, 200))
+  }
 
-  throw new Error("Format respon API tidak dikenali: " + JSON.stringify(item).slice(0, 200))
+  return url
 }
 
 /**
  * Edit gambar berdasarkan instruksi prompt
  * @param {{ prompt: string, imageBuffer: Buffer, model: string }} opts
- * @returns {Promise<string>} URL gambar hasil edit
+ * @returns {Promise<string>} URL atau data:URI gambar hasil edit
  */
 async function editImage({ prompt, imageBuffer, model }) {
   if (!API_KEY) throw new Error("RUXA_API_KEY belum diset di environment")
@@ -68,27 +79,33 @@ async function editImage({ prompt, imageBuffer, model }) {
     contentType: "image/png"
   })
 
-  const res = await axios.post(
-    `${BASE_URL}/images/edits`,
-    form,
-    {
-      headers: {
-        ...getHeaders(),
-        ...form.getHeaders()
-      },
-      timeout: 120000
-    }
-  )
-
-  const item = res.data?.data?.[0]
-  if (!item) {
-    throw new Error("Tidak ada data gambar dari API: " + JSON.stringify(res.data).slice(0, 200))
+  let res
+  try {
+    res = await axios.post(
+      `${BASE_URL}/images/edits`,
+      form,
+      {
+        headers: { ...getHeaders(), ...form.getHeaders() },
+        timeout: 120000
+      }
+    )
+  } catch (err) {
+    const detail = err?.response?.data
+    const status = err?.response?.status
+    console.log(`[ruxaimage] editImage error ${status}:`, JSON.stringify(detail).slice(0, 400))
+    throw new Error(
+      `API error ${status}: ` +
+      (detail?.error?.message || detail?.message || JSON.stringify(detail).slice(0, 200))
+    )
   }
 
-  if (item.url)      return item.url
-  if (item.b64_json) return `data:image/png;base64,${item.b64_json}`
+  const url = extractImageUrl(res.data)
+  if (!url) {
+    console.log("[ruxaimage] editImage unknown response:", JSON.stringify(res.data).slice(0, 400))
+    throw new Error("Format respon tidak dikenali: " + JSON.stringify(res.data).slice(0, 200))
+  }
 
-  throw new Error("Format respon API tidak dikenali: " + JSON.stringify(item).slice(0, 200))
+  return url
 }
 
 module.exports = { generateImage, editImage }

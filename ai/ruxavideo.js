@@ -30,27 +30,34 @@ async function generateVideo({ prompt, modelKey }) {
 
   const headers = getHeaders()
 
-  const res = await axios.post(
-    `${BASE_URL}/video/generations`,
-    {
-      model:  modelKey,
-      prompt,
-      size:   "1280x720"
-    },
-    { headers, timeout: 60000 }
-  )
+  let res
+  try {
+    res = await axios.post(
+      `${BASE_URL}/video/generations`,
+      { model: modelKey, prompt },
+      { headers, timeout: 60000 }
+    )
+  } catch (err) {
+    const detail = err?.response?.data
+    const status = err?.response?.status
+    console.log(`[ruxavideo] generateVideo error ${status}:`, JSON.stringify(detail).slice(0, 400))
+    throw new Error(
+      `API error ${status}: ` +
+      (detail?.error?.message || detail?.message || JSON.stringify(detail).slice(0, 200))
+    )
+  }
 
   const data = res.data
 
-  if (data?.data?.[0]?.url)      return data.data[0].url
-  if (data?.url)                 return data.url
-  if (data?.video_url)           return data.video_url
+  if (data?.data?.[0]?.url)  return data.data[0].url
+  if (data?.url)             return data.url
+  if (data?.video_url)       return data.video_url
 
   const taskId = data?.task_id || data?.id || data?.data?.[0]?.task_id
   if (!taskId) {
+    console.log("[ruxavideo] unknown response:", JSON.stringify(data).slice(0, 400))
     throw new Error(
-      "Tidak mendapat URL video atau task_id dari API: " +
-      JSON.stringify(data).slice(0, 300)
+      "Tidak mendapat URL video atau task_id: " + JSON.stringify(data).slice(0, 200)
     )
   }
 
@@ -67,34 +74,30 @@ async function pollVideoTask(taskId, headers, maxWaitMs = 300000) {
   for (let i = 0; i < maxTries; i++) {
     await new Promise(r => setTimeout(r, interval))
 
+    let result
     try {
       const poll = await axios.get(
         `${BASE_URL}/video/generations/${taskId}`,
         { headers, timeout: 20000 }
       )
-
-      const result = poll.data
-
-      if (result?.data?.[0]?.url) return result.data[0].url
-      if (result?.url)            return result.url
-      if (result?.video_url)      return result.video_url
-
-      const status = result?.status || result?.data?.[0]?.status
-
-      if (status === "failed" || status === "error") {
-        throw new Error(
-          "Generate video gagal: " +
-          (result?.error || result?.message || "unknown error")
-        )
-      }
-
+      result = poll.data
     } catch (pollErr) {
-      if (
-        pollErr.message.includes("gagal") ||
-        pollErr.message.includes("failed")
-      ) {
-        throw pollErr
-      }
+      console.log("[ruxavideo] poll error:", pollErr?.message)
+      continue
+    }
+
+    if (result?.data?.[0]?.url) return result.data[0].url
+    if (result?.url)            return result.url
+    if (result?.video_url)      return result.video_url
+
+    const status = result?.status || result?.data?.[0]?.status
+    console.log(`[ruxavideo] poll [${i + 1}/${maxTries}] status:`, status)
+
+    if (status === "failed" || status === "error") {
+      throw new Error(
+        "Generate video gagal: " +
+        (result?.error || result?.message || "unknown error")
+      )
     }
   }
 
