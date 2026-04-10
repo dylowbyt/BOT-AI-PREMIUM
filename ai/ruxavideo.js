@@ -7,7 +7,7 @@
 const axios = require("axios")
 
 const RUXA_API_KEY = process.env.RUXA_API_KEY
-const RUXA_BASE_URL = process.env.RUXA_BASE_URL || "https://api.ruxa.ai/v1"
+const RUXA_BASE_URL = process.env.RUXA_BASE_URL || "https://ruxa.ai/api/v1/tasks/create"
 
 const MODEL_CONFIG = {
   "veo-3":   { model: "veo-3",   label: "Google Veo 3"   },
