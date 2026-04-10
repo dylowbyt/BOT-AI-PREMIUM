@@ -6,8 +6,8 @@
 const { generateImage }                           = require("../ai/storynote")
 const { useTokens, getTokens, getTokenWarning }   = require("../ai/tokendb")
 
-const API_KEY    = process.env.STORYNOTE_API_KEY
-const FAST_MODEL = process.env.STORYNOTE_FAST_MODEL || "fal-ai/flux-schnell"
+const API_KEY    = process.env.STORYNOTE_API_KEY || process.env.RUXA_API_KEY
+const FAST_MODEL = process.env.STORYNOTE_FAST_MODEL || process.env.RUXA_FAST_MODEL || "dall-e-3"
 const TOKEN_COST = 1
 
 async function getImage(prompt) {
