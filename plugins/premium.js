@@ -179,7 +179,7 @@ module.exports = {
           `🎬 .veo3          — 16 token  (Google Veo 3)\n` +
           `🎥 .veo31         — 18 token  (Google Veo 3.1)\n\n` +
           `━━━━━━━━━━━━━━━━━━━━\n` +
-          `📝 Ketik: *.buy basic* / *.buy medium* / *.buy pro*`
+          `📝 Ketik: *.buy basic* / *.buy medium* / *.buy pro* / *.tutorial*`
       })
     }
 
