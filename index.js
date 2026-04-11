@@ -115,20 +115,20 @@ async function startBot() {
     const { connection, qr, lastDisconnect } = update
 
     if (qr) {
-      console.log("📱 QR TERDETEKSI")
+      console.log("ð± QR TERDETEKSI")
       const qrImage = await QRCode.toDataURL(qr)
       console.log(qrImage)
     }
 
     if (connection === "open") {
-      console.log("✅ BOT CONNECTED")
+      console.log("â BOT CONNECTED")
       startGempaMonitor(sock)
       startPaymentChecker(sock)
     }
 
     if (connection === "close") {
       const reason = lastDisconnect?.error?.output?.statusCode
-      console.log("❌ Disconnect:", reason)
+      console.log("â Disconnect:", reason)
 
       if (reason !== DisconnectReason.loggedOut) {
         setTimeout(startBot, 5000)
@@ -163,7 +163,7 @@ async function startBot() {
       const isGroup = from.endsWith("@g.us")
       const sender = m.key.participant || m.key.remoteJid
 
-      // ===== IMAGE DETECT (DIPINDAH KE ATAS ✅) =====
+      // ===== IMAGE DETECT (DIPINDAH KE ATAS â) =====
       const directImage = m.message?.imageMessage
       const quotedImage = quoted?.imageMessage
       const isImage = !!(directImage || quotedImage)
@@ -190,7 +190,7 @@ async function startBot() {
         }
       }
 
-      // ===== AUTOPILOT CHECK (SEKARANG AMAN ✅) =====
+      // ===== AUTOPILOT CHECK (SEKARANG AMAN â) =====
       if (isGroup) {
         try {
           const autopilot = require("./plugins/autopilot")
@@ -204,6 +204,44 @@ async function startBot() {
       }
 
       if (isGroup && !text.startsWith(".")) return
+
+      // ===== ANON SWAP â harus SEBELUM brain & plugin =====
+      // Jika user dalam sesi anon: semua pesan diteruskan ke partner
+      // Semua AI/plugin/fitur bot diblokir selama mode ini aktif
+      try {
+        const anondb = require("./ai/anondb")
+        if (anondb.isInSession(sender)) {
+
+          // .stop â keluar dari sesi
+          if (text.toLowerCase() === ".stop") {
+            const partnerId = anondb.endSession(sender)
+            await sock.sendMessage(from, {
+              text:
+                `ðª *Kamu keluar dari anonymous chat.*\n\n` +
+                `â Semua fitur AI & bot kembali aktif!\n` +
+                `Ketik *.anon* untuk cari stranger lagi.`
+            })
+            if (partnerId) {
+              await sock.sendMessage(partnerId, {
+                text:
+                  `â ï¸ *Stranger telah keluar dari chat.*\n\n` +
+                  `Ketik *.anon* untuk cari stranger baru.`
+              })
+            }
+            return
+          }
+
+          // Semua pesan lain â forward ke partner
+          const partnerId = anondb.getPartner(sender)
+          if (partnerId) {
+            await anondb.forwardMessage(sock, m, sender, partnerId)
+          }
+          return // â BLOKIR semua AI/plugin/bot
+        }
+      } catch (anonErr) {
+        console.log("Anon swap error:", anonErr.message)
+      }
+      // âââââââââââââââââââââââââââââââââââââââââââââââââ
 
       // ===== BRAIN =====
       let res = null
@@ -263,7 +301,7 @@ async function startBot() {
             await plugin.run(sock, m, args)
           } catch (e) {
             console.log("Plugin run error:", file, e.message)
-            await sock.sendMessage(from, { text: "❌ Error menjalankan fitur: " + e.message })
+            await sock.sendMessage(from, { text: "â Error menjalankan fitur: " + e.message })
           }
           return
         }
@@ -271,7 +309,7 @@ async function startBot() {
 
       if (isFromAI) {
         return sock.sendMessage(from, {
-          text: "❌ Fitur tidak ditemukan"
+          text: "â Fitur tidak ditemukan"
         })
       }
 
@@ -346,7 +384,7 @@ async function startBot() {
         } catch (err) {
           console.log("AI ERROR:", err.message)
           await sock.sendMessage(from, {
-            text: "⚠️ AI error, coba lagi nanti"
+            text: "â ï¸ AI error, coba lagi nanti"
           })
         }
       }
