@@ -1,6 +1,6 @@
 /**
  * aivideoapi.js — Helper generate video via aivideoapi.com
- * Mendukung model: Runway Gen3, Gen3 Turbo
+ * Mendukung model: Runway Gen3, Gen3 Turbo, Gen4
  * Docs: https://www.aivideoapi.com/dashboard
  */
 
@@ -9,13 +9,12 @@ const axios = require("axios")
 const AIVIDEO_API_KEY = process.env.AIVIDEO_API_KEY
 const BASE_URL        = "https://api.aivideoapi.com"
 
-// Model names sesuai aivideoapi.com docs
 const MODEL_CONFIG = {
   "runway-gen3":       { model: "gen3",              label: "Runway Gen3"       },
-  "runway-gen3-turbo": { model: "gen3_alpha_turbo",  label: "Runway Gen3 Turbo" }
+  "runway-gen3-turbo": { model: "gen3_alpha_turbo",  label: "Runway Gen3 Turbo" },
+  "runway-gen4":       { model: "gen4",              label: "Runway Gen4"       }
 }
 
-// Konversi ratio user (16:9) → format API (1280:768)
 const RATIO_MAP = {
   "16:9": "1280:768",
   "9:16": "768:1280",
@@ -31,21 +30,12 @@ function getHeaders() {
   }
 }
 
-/**
- * Generate video Runway via aivideoapi.com
- * @param {string} prompt       - Deskripsi video
- * @param {string} modelKey     - "runway-gen3" | "runway-gen3-turbo"
- * @param {number} duration     - 5 atau 10 detik
- * @param {string} ratio        - "16:9" | "9:16" | "1:1" | "4:3" | "3:4"
- * @param {number} maxWaitMs    - Maks tunggu polling (default 5 menit)
- */
 async function generateVideo({ prompt, modelKey = "runway-gen3", duration = 5, ratio = "16:9", maxWaitMs = 300000 }) {
   if (!AIVIDEO_API_KEY) throw new Error("AIVIDEO_API_KEY belum diset di environment")
 
   const config = MODEL_CONFIG[modelKey]
-  if (!config) throw new Error(`Model tidak dikenal: ${modelKey}`)
+  if (!config) throw new Error(`Model tidak dikenal: ${modelKey}. Tersedia: ${Object.keys(MODEL_CONFIG).join(", ")}`)
 
-  // Konversi ratio ke format API
   const apiRatio = RATIO_MAP[ratio] || RATIO_MAP["16:9"]
 
   console.log(`[AIVideoAPI] Generating: model=${config.model} ratio=${apiRatio} duration=${duration}`)
@@ -84,21 +74,18 @@ async function generateVideo({ prompt, modelKey = "runway-gen3", duration = 5, r
   const data = res.data
   console.log("[AIVideoAPI] Generate response:", JSON.stringify(data))
 
-  // Kalau langsung dapat URL
   if (data.url || data.video_url) {
     return data.url || data.video_url
   }
 
-  // Ambil task ID untuk polling
   const taskId = data.uuid || data.id || data.task_id
   if (!taskId) {
     console.log("[AIVideoAPI] Full response:", JSON.stringify(data))
-    throw new Error("Tidak mendapat task ID dari aivideoapi.com. Response: " + JSON.stringify(data))
+    throw new Error("Tidak mendapat task ID dari aivideoapi.com. Response: " + JSON.stringify(data).slice(0, 300))
   }
 
   console.log(`[AIVideoAPI] Task ID: ${taskId} — mulai polling...`)
 
-  // Polling status
   const interval = 5000
   const maxTries = Math.ceil(maxWaitMs / interval)
 
