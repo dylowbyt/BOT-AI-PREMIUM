@@ -1,23 +1,34 @@
 /**
- * cekruxa.js — Diagnostic: cek model list & status akun Ruxa AI
+ * cekruxa.js — Diagnostic: test model IDs langsung ke Ruxa API
  *
  * Commands:
- *   .cekruxa         → lihat semua model yang tersedia di akun Ruxa AI
+ *   .cekruxa         → auto-test semua kemungkinan nama model nano/gpt
  *   .testmodel <id>  → test apakah model ID tertentu bisa digunakan
  */
 
 const axios = require("axios")
 
-async function fetchModelList(apiKey) {
-  const res = await axios.get("https://api.ruxa.ai/v1/models", {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "x-platform":  "ruxa"
-    },
-    timeout: 15000
-  })
-  return res.data
-}
+// Daftar model yang ingin kita cari nama yang benar
+const CANDIDATES = [
+  // Nano Banana Basic — kemungkinan nama API
+  "nano-banana",
+  "nano-banana-basic",
+  "nano-banana-1",
+  "nano-banana-v1",
+  "banana",
+  "nano",
+  "nanoBanana",
+  "nano_banana",
+  // Nano Banana 2
+  "nano-banana-2",
+  "nano-banana-2-v2",
+  // GPT Image
+  "gpt-image-1",
+  "gpt-image-1-5",
+  "gpt-image-1.5",
+  "gpt-4o-image",
+  "gpt-4o",
+]
 
 async function testModel(apiKey, modelId) {
   const res = await axios.post(
@@ -109,72 +120,79 @@ module.exports = {
       }
     }
 
-    // ── .cekruxa → list semua model tersedia ─────────────────────
+    // ── .cekruxa → auto-test semua kandidat nama model ──────────
     await sock.sendMessage(from, {
-      text: "🔍 Mengambil daftar model dari Ruxa AI..."
+      text:
+        `🔍 *Auto-testing ${CANDIDATES.length} model name candidates...*\n` +
+        `Mohon tunggu, ini mungkin butuh ~30 detik.`
     })
 
-    try {
-      const data = await fetchModelList(apiKey)
+    const working   = []
+    const notFound  = []
+    const otherFail = []
 
-      const models = Array.isArray(data?.data)
-        ? data.data
-        : Array.isArray(data)
-          ? data
-          : []
+    for (const modelId of CANDIDATES) {
+      try {
+        const result  = await testModel(apiKey, modelId)
+        const code    = result?.code
+        const message = (result?.message || "").toLowerCase()
+        const taskId  = result?.data?.taskId
 
-      if (models.length === 0) {
-        return sock.sendMessage(from, {
-          text:
-            `⚠️ *Tidak ada model ditemukan*\n\n` +
-            `Response raw:\n${JSON.stringify(data, null, 2).slice(0, 500)}`
-        })
+        if (taskId) {
+          // Task berhasil dibuat → model ID ini valid!
+          working.push({ id: modelId, taskId })
+        } else if (
+          message.includes("未找到") ||
+          message.includes("渠道") ||
+          message.includes("not found") ||
+          message.includes("not support") ||
+          code === 404
+        ) {
+          notFound.push({ id: modelId, msg: result?.message })
+        } else {
+          otherFail.push({ id: modelId, code, msg: result?.message })
+        }
+      } catch (err) {
+        const rawMsg = (err.response?.data?.message || err.message || "").toLowerCase()
+        if (
+          rawMsg.includes("未找到") ||
+          rawMsg.includes("渠道") ||
+          rawMsg.includes("not found") ||
+          rawMsg.includes("not support")
+        ) {
+          notFound.push({ id: modelId, msg: err.response?.data?.message || err.message })
+        } else {
+          otherFail.push({ id: modelId, msg: err.response?.data?.message || err.message })
+        }
       }
-
-      const imageModels = models.filter(m => {
-        const id = (m.id || m.name || "").toLowerCase()
-        return !id.includes("veo") && !id.includes("sora") && !id.includes("runway") && !id.includes("kling")
-      })
-      const videoModels = models.filter(m => {
-        const id = (m.id || m.name || "").toLowerCase()
-        return id.includes("veo") || id.includes("sora") || id.includes("runway") || id.includes("kling")
-      })
-      const otherModels = models.filter(m => {
-        const id = (m.id || m.name || "").toLowerCase()
-        return !imageModels.includes(m) && !videoModels.includes(m)
-      })
-
-      const fmtModels = (arr) =>
-        arr.map(m => `• \`${m.id || m.name}\`` + (m.displayName || m.label ? ` — ${m.displayName || m.label}` : "")).join("\n")
-
-      let msg = `🤖 *DAFTAR MODEL RUXA AI*\n` +
-                `━━━━━━━━━━━━━━━━━━━━\n` +
-                `Total: *${models.length} model*\n\n`
-
-      if (imageModels.length > 0) {
-        msg += `🖼️ *IMAGE MODELS (${imageModels.length}):*\n${fmtModels(imageModels)}\n\n`
-      }
-      if (videoModels.length > 0) {
-        msg += `🎬 *VIDEO MODELS (${videoModels.length}):*\n${fmtModels(videoModels)}\n\n`
-      }
-      if (otherModels.length > 0) {
-        msg += `📦 *MODEL LAIN (${otherModels.length}):*\n${fmtModels(otherModels)}\n\n`
-      }
-
-      msg += `━━━━━━━━━━━━━━━━━━━━\n` +
-             `💡 Cek model ID spesifik: *.testmodel <id>*`
-
-      return sock.sendMessage(from, { text: msg })
-
-    } catch (err) {
-      const rawMsg = err.response?.data || err.message
-      const status = err.response?.status || "-"
-      return sock.sendMessage(from, {
-        text:
-          `❌ *Gagal ambil model list*\n\n` +
-          `📊 HTTP Status: ${status}\n` +
-          `📝 Pesan:\n${typeof rawMsg === "object" ? JSON.stringify(rawMsg) : rawMsg}`
-      })
     }
+
+    let report = `🤖 *HASIL CEK MODEL RUXA AI*\n━━━━━━━━━━━━━━━━━━━━\n\n`
+
+    if (working.length > 0) {
+      report += `✅ *MODEL VALID (task berhasil dibuat):*\n`
+      working.forEach(m => { report += `• \`${m.id}\`\n` })
+      report += `\n`
+    } else {
+      report += `❌ Tidak ada model yang berhasil buat task.\n\n`
+    }
+
+    if (otherFail.length > 0) {
+      report += `⚠️ *MODEL ADA tapi gagal (perlu investigasi):*\n`
+      otherFail.forEach(m => {
+        const shortMsg = (m.msg || "").slice(0, 60)
+        report += `• \`${m.id}\` — ${shortMsg}\n`
+      })
+      report += `\n`
+    }
+
+    if (notFound.length > 0) {
+      report += `🚫 *Model tidak dikenali (${notFound.length}):*\n`
+      notFound.forEach(m => { report += `• \`${m.id}\`` + `\n` })
+    }
+
+    report += `\n━━━━━━━━━━━━━━━━━━━━\n💡 Test model lain: *.testmodel <id>*`
+
+    return sock.sendMessage(from, { text: report })
   }
 }
