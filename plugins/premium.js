@@ -18,6 +18,7 @@
 const axios  = require("axios")
 const { getTokens, addTokens }                              = require("../ai/tokendb")
 const { addPendingPayment, getByReference, updateStatus }   = require("../ai/paymentdb")
+const { isAdmin, cleanNumber }                              = require("../ai/ownerHelper")
 
 const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY
 const IS_SANDBOX          = process.env.MIDTRANS_SANDBOX === "true"
@@ -26,6 +27,7 @@ const SNAP_BASE_URL       = IS_SANDBOX
   : "https://app.midtrans.com/snap/v1"
 
 const ADMIN_NUMBER = process.env.ADMIN_NUMBER || "6283866344919"
+
 
 const PACKAGES = {
   basic:  { tokens: 20,  price: 10000, label: "Basic"  },
@@ -321,8 +323,7 @@ module.exports = {
 
     // ─── .addtoken <nomor> <jumlah> (admin only) ───────────────
     if (command === "addtoken") {
-      const senderNumber = sender.replace(/@s\.whatsapp\.net$/, "").replace(/:\d+$/, "")
-      if (senderNumber !== ADMIN_NUMBER) {
+      if (!isAdmin(sender)) {
         return sock.sendMessage(from, { text: "❌ Perintah ini hanya untuk admin." })
       }
 

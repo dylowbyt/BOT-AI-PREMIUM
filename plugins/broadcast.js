@@ -11,13 +11,7 @@
  */
 
 const { getAllUsers, getUserCount } = require("../ai/userdb")
-
-const ADMIN_NUMBER = process.env.ADMIN_NUMBER || "6283866344919"
-
-function isAdmin(sender) {
-  const num = sender.replace(/@s\.whatsapp\.net$/, "").replace(/:\d+$/, "")
-  return num === ADMIN_NUMBER
-}
+const { isAdmin } = require("../ai/ownerHelper")
 
 const DELAY_MS = 1000
 

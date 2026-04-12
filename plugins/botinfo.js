@@ -1,6 +1,7 @@
 const fs = require("fs")
 const path = require("path")
 const identity = require("./identity")
+const { isOwner } = require("../ai/ownerHelper")
 
 const CONFIG_PATH = path.join(__dirname, "../owner-config.json")
 
@@ -54,8 +55,7 @@ module.exports = {
 
     // ===== SETNAME — ganti nama bot (owner only) =====
     if (command === "setname") {
-      const ownerNumber = identity.nomorPembuat + "@s.whatsapp.net"
-      if (sender !== ownerNumber) {
+      if (!isOwner(sender)) {
         return sock.sendMessage(from, { text: "❌ Perintah ini hanya untuk owner bot." })
       }
       const namaBaru = args.join(" ").trim()
@@ -77,8 +77,7 @@ module.exports = {
 
     // ===== OWNERSETTING — menu setting owner =====
     if (command === "ownersetting") {
-      const ownerNumber = identity.nomorPembuat + "@s.whatsapp.net"
-      if (sender !== ownerNumber) {
+      if (!isOwner(sender)) {
         return sock.sendMessage(from, { text: "❌ Perintah ini hanya untuk owner bot." })
       }
       return sock.sendMessage(from, {
