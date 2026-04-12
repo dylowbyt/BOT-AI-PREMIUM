@@ -1,18 +1,17 @@
 /**
  * ownerHelper.js — Helper terpusat untuk cek admin/owner
- * NOMOR ADMIN/OWNER DIPAKSA: 6283866344919
+ * Support format @s.whatsapp.net DAN @lid (WhatsApp versi baru)
  */
 
-// ✅ NOMOR OWNER & ADMIN — PAKSA HARDCODE
+// ✅ NOMOR OWNER & ADMIN
 const OWNER_NUMBER = "6283866344919"
 const ADMIN_NUMBER = "6283866344919"
 
-/**
- * Bersihkan nomor sender dari suffix device & domain WA
- * "6283866344919:12@s.whatsapp.net" → "6283866344919"
- * "6283866344919@s.whatsapp.net"    → "6283866344919"
- * "083866344919"                    → "6283866344919"
- */
+// ✅ LID OWNER & ADMIN (format baru WA untuk pesan grup)
+// Didapat dari Railway logs: sender raw "213013684609202@lid"
+const OWNER_LID = "213013684609202@lid"
+const ADMIN_LID = "213013684609202@lid"
+
 function cleanNumber(sender) {
   let num = (sender || "")
     .replace(/@s\.whatsapp\.net$/, "")
@@ -20,7 +19,6 @@ function cleanNumber(sender) {
     .replace(/:\d+$/, "")
     .trim()
 
-  // Konversi 08xxx → 628xxx
   if (num.startsWith("0")) {
     num = "62" + num.slice(1)
   }
@@ -29,15 +27,31 @@ function cleanNumber(sender) {
 }
 
 function isOwner(sender) {
+  // Cek format @lid (grup WA versi baru)
+  if ((sender || "").includes("@lid")) {
+    const match = sender === OWNER_LID
+    console.log(`[OWNER LID CHECK] "${sender}" === "${OWNER_LID}" → ${match}`)
+    return match
+  }
+  // Cek format nomor biasa
   const cleaned = cleanNumber(sender)
-  console.log(`[OWNER CHECK] sender raw: "${sender}" | cleaned: "${cleaned}" | OWNER_NUMBER: "${OWNER_NUMBER}" | match: ${cleaned === OWNER_NUMBER}`)
-  return cleaned === OWNER_NUMBER
+  const match = cleaned === OWNER_NUMBER
+  console.log(`[OWNER CHECK] "${cleaned}" === "${OWNER_NUMBER}" → ${match}`)
+  return match
 }
 
 function isAdmin(sender) {
+  // Cek format @lid (grup WA versi baru)
+  if ((sender || "").includes("@lid")) {
+    const match = sender === ADMIN_LID
+    console.log(`[ADMIN LID CHECK] "${sender}" === "${ADMIN_LID}" → ${match}`)
+    return match
+  }
+  // Cek format nomor biasa
   const cleaned = cleanNumber(sender)
-  console.log(`[ADMIN CHECK] sender raw: "${sender}" | cleaned: "${cleaned}" | ADMIN_NUMBER: "${ADMIN_NUMBER}" | match: ${cleaned === ADMIN_NUMBER}`)
-  return cleaned === ADMIN_NUMBER
+  const match = cleaned === ADMIN_NUMBER
+  console.log(`[ADMIN CHECK] "${cleaned}" === "${ADMIN_NUMBER}" → ${match}`)
+  return match
 }
 
 function isAdminOrOwner(sender) {
@@ -45,3 +59,4 @@ function isAdminOrOwner(sender) {
 }
 
 module.exports = { cleanNumber, isOwner, isAdmin, isAdminOrOwner, OWNER_NUMBER, ADMIN_NUMBER }
+
