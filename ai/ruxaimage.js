@@ -1,30 +1,43 @@
 /**
- * ruxaimage.js — Helper untuk generate & edit gambar via Ruxa AI / AIVideoAPI
- * Dipanggil oleh plugins/imggen.js, messybun.js, hdpro.js, promtmulin.js, dll
+ * ruxaimage.js — Generate & edit gambar via Ruxa AI
  *
- * ENV yang dibutuhkan (salah satu):
- *   AIVIDEO_API_KEY — API Key dari aivideoapi.com (prioritas)
- *   RUXA_API_KEY    — API Key dari ruxa.ai (fallback)
- *
- * ENV opsional:
- *   IMAGE_API_BASE_URL — Override base URL API (default: auto-detect)
+ * ENV:
+ *   RUXA_API_KEY   — API Key utama ruxa.ai
+ *   RUXA_API_KEY_2 — API Key backup ruxa.ai (opsional)
  */
 
 const axios = require("axios")
 const FormData = require("form-data")
 
-const API_KEY = process.env.AIVIDEO_API_KEY || process.env.RUXA_API_KEY
-const BASE_URL = process.env.IMAGE_API_BASE_URL || (process.env.AIVIDEO_API_KEY ? "https://api.aivideoapi.com" : "https://api.ruxa.ai/api/v1")
+const BASE_URL = "https://api.ruxa.ai/api/v1"
 
+// Model mapping: nama lokal → nama model resmi di Ruxa AI
 const MODEL_MAP = {
-  "nano-banana":      "google/nano-banana",
-  "nano-banana-2":    "google/nano-banana-2",
-  "nano-banana-pro":  "google/nano-banana-pro",
-  "nano-banana-edit": "google/nano-banana-edit",
-  "gpt-image-1.5":    "gpt-image-1.5",
-  "gpt-4o":           "gpt-4o-image"
+  "nano-banana":      "nano-banana",
+  "nano-banana-2":    "nano-banana-2",
+  "nano-banana-pro":  "nano-banana-pro",
+  "nano-banana-edit": "nano-banana-edit",
+  "gpt-image-1":      "gpt-image-1",
+  "gpt-image-1.5":    "gpt-image-1-5",
+  "gpt-image-1-5":    "gpt-image-1-5",
+  "gpt-4o":           "gpt-4o-image",
+  "gpt-4o-image":     "gpt-4o-image"
 }
 
+// Ambil API key — coba utama dulu, fallback ke backup
+function getApiKey(useBackup = false) {
+  const key = useBackup
+    ? process.env.RUXA_API_KEY_2
+    : process.env.RUXA_API_KEY
+
+  if (!key) {
+    if (!useBackup) throw new Error("RUXA_API_KEY belum diset di environment")
+    throw new Error("RUXA_API_KEY_2 (backup) belum diset di environment")
+  }
+  return key
+}
+
+// Upload buffer gambar ke catbox.moe → dapat URL publik
 async function uploadToCatbox(buffer) {
   const form = new FormData()
   form.append("reqtype", "fileupload")
@@ -40,137 +53,117 @@ async function uploadToCatbox(buffer) {
   return url
 }
 
+// Terjemahkan error dari Ruxa AI
 function translateError(msg, httpStatus) {
-  if (httpStatus === 404) return "Endpoint API tidak ditemukan (404). Periksa koneksi atau API Key"
-  if (httpStatus === 401) return "API Key tidak valid atau sudah kedaluwarsa. Periksa AIVIDEO_API_KEY / RUXA_API_KEY"
-  if (httpStatus === 402) return "Kredit API habis. Top up di dashboard API provider"
-  if (httpStatus === 429) return "Terlalu banyak request. Tunggu beberapa saat lalu coba lagi"
-  if (httpStatus === 500) return "Server API sedang bermasalah (500). Coba lagi beberapa menit"
-
-  if (!msg) return "Terjadi kesalahan pada API"
-
+  if (httpStatus === 401) return "API Key Ruxa AI tidak valid atau kedaluwarsa"
+  if (httpStatus === 429) return "Terlalu banyak request ke Ruxa AI, tunggu sebentar"
+  if (httpStatus === 500) return "Server Ruxa AI sedang bermasalah, coba lagi nanti"
+  if (!msg) return "Terjadi kesalahan pada Ruxa AI"
   if (msg.includes("积分不足")) {
     const match = msg.match(/([\d.]+).*?([\d.]+)\s*积分/)
-    if (match) {
-      return (
-        `Kredit API tidak mencukupi.\n\n` +
-        `💰 Butuh: *${match[1]} kredit*\n` +
-        `💳 Saldo sekarang: *${match[2]} kredit*\n\n` +
-        `Top up di dashboard API provider`
-      )
-    }
-    return "Kredit API tidak mencukupi. Top up di dashboard API provider"
+    if (match) return `Kredit Ruxa AI tidak cukup.\n💰 Butuh: ${match[1]}\n💳 Saldo: ${match[2]}\nTop up: https://ruxa.ai/dashboard`
+    return "Kredit Ruxa AI tidak cukup. Top up di https://ruxa.ai/dashboard"
   }
-
-  if (msg.includes("未找到支持模型") || msg.includes("渠道")) {
-    return "Model tidak tersedia di akun kamu. Cek dashboard API provider"
-  }
-
-  if (msg.includes("请求频率") || msg.includes("频率限制")) {
-    return "Terlalu banyak request. Tunggu beberapa saat lalu coba lagi"
-  }
-
+  if (msg.includes("未找到支持模型") || msg.includes("渠道")) return "Model tidak tersedia di akun Ruxa AI"
   return msg
 }
 
-function getHeaders() {
-  return {
-    Authorization: `Bearer ${API_KEY}`,
-    "Content-Type": "application/json"
-  }
-}
-
-async function createAndPoll(ruxaModel, input) {
-  if (!API_KEY) throw new Error("AIVIDEO_API_KEY atau RUXA_API_KEY belum diset di environment")
-
-  const isAIVideoAPI = BASE_URL.includes("aivideoapi.com")
-
-  let createUrl, pollUrlBase
-  if (isAIVideoAPI) {
-    createUrl = `${BASE_URL}/tasks/create`
-    pollUrlBase = `${BASE_URL}/tasks/query`
-  } else {
-    createUrl = `${BASE_URL}/tasks/create`
-    pollUrlBase = `${BASE_URL}/tasks/query`
-  }
-
+// Buat task & polling sampai selesai
+async function createAndPoll(ruxaModel, input, apiKey) {
+  // 1. Buat task
   let res
   try {
     res = await axios.post(
-      createUrl,
+      `${BASE_URL}/tasks/create`,
       { model: ruxaModel, input },
-      { headers: getHeaders(), timeout: 30000 }
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        },
+        timeout: 30000
+      }
     )
   } catch (err) {
     const status = err.response?.status
-    const errMsg = err.response?.data?.message || err.response?.data?.error || err.message
-
-    if (status === 404) {
-      throw new Error(
-        `Endpoint tidak ditemukan (404). ` +
-        `Base URL: ${BASE_URL}\n` +
-        `Pastikan API Key dan endpoint sudah benar.`
-      )
-    }
-    if (status) throw new Error(translateError(errMsg, status))
-    throw new Error(`Koneksi ke API gagal: ${err.message}`)
+    if (status) throw new Error(translateError(err.response?.data?.message, status))
+    throw new Error(`Koneksi ke Ruxa AI gagal: ${err.message}`)
   }
 
-  const data = res.data
-
-  if (data?.code && data.code !== 200) {
-    throw new Error(translateError(data?.message))
+  if (res.data?.code !== 200) {
+    throw new Error(translateError(res.data?.message))
   }
 
-  const taskId = data?.data?.taskId || data?.uuid || data?.id || data?.task_id
-  if (!taskId) {
-    if (data?.data?.resultUrls?.[0]) return data.data.resultUrls[0]
-    if (data?.url || data?.image_url) return data.url || data.image_url
-    throw new Error("Tidak ada task ID dari API. Response: " + JSON.stringify(data).slice(0, 300))
-  }
+  const taskId = res.data?.data?.taskId
+  if (!taskId) throw new Error("Tidak ada task ID dari Ruxa AI")
 
+  // 2. Polling tiap 4 detik, maks 2 menit (30x)
   for (let i = 0; i < 30; i++) {
     await new Promise(r => setTimeout(r, 4000))
 
     let queryRes
     try {
       queryRes = await axios.get(
-        `${pollUrlBase}/${taskId}`,
-        { headers: getHeaders(), timeout: 10000 }
+        `${BASE_URL}/tasks/query/${taskId}`,
+        {
+          headers: { Authorization: `Bearer ${apiKey}` },
+          timeout: 10000
+        }
       )
     } catch (err) {
       const status = err.response?.status
-      if (status === 404) throw new Error("Task tidak ditemukan. Coba generate ulang")
+      if (status === 404) throw new Error("Task tidak ditemukan di Ruxa AI")
       if (status === 401) throw new Error(translateError(null, 401))
-      console.log(`[ruxaimage] Polling error (attempt ${i + 1}):`, err.message)
-      continue
+      continue // skip, coba lagi di iterasi berikutnya
     }
 
-    const taskData = queryRes.data?.data || queryRes.data || {}
-    const state = taskData.state || taskData.status || ""
-    const stateLower = state.toLowerCase()
+    const { state, resultJson } = queryRes.data?.data || {}
 
-    if (stateLower === "success" || stateLower === "succeeded" || stateLower === "completed") {
+    if (state === "success") {
       let parsed = {}
-      try { parsed = JSON.parse(taskData.resultJson || "{}") } catch {}
-      const url = parsed?.resultUrls?.[0] || taskData.url || taskData.image_url || taskData.resultUrl
+      try { parsed = JSON.parse(resultJson || "{}") } catch {}
+      const url = parsed?.resultUrls?.[0]
       if (!url) throw new Error("Gambar selesai tapi URL tidak ditemukan")
       return url
     }
 
-    if (stateLower === "fail" || stateLower === "failed" || stateLower === "error") {
-      throw new Error("API gagal membuat gambar: " + (taskData.error || taskData.message || state))
+    if (state === "fail") {
+      throw new Error("Ruxa AI gagal membuat gambar. Coba prompt yang berbeda")
     }
   }
 
-  throw new Error("Timeout (2 menit) menunggu gambar dari API. Coba lagi nanti")
+  throw new Error("Timeout (2 menit) menunggu gambar dari Ruxa AI")
 }
 
+// Coba dengan key utama, fallback ke backup jika gagal
+async function createAndPollWithFallback(ruxaModel, input) {
+  const primaryKey = getApiKey(false)
+
+  try {
+    return await createAndPoll(ruxaModel, input, primaryKey)
+  } catch (err) {
+    // Hanya fallback ke backup jika ada & error bukan dari prompt/model
+    const backupKey = process.env.RUXA_API_KEY_2
+    const isKeyError = err.message.includes("tidak valid") ||
+                       err.message.includes("kedaluwarsa") ||
+                       err.message.includes("tidak cukup")
+
+    if (backupKey && isKeyError) {
+      console.log("[ruxaimage] Primary key gagal, coba backup key...")
+      return await createAndPoll(ruxaModel, input, backupKey)
+    }
+
+    throw err
+  }
+}
+
+// Generate gambar dari teks
 async function generateImage({ prompt, model }) {
   const ruxaModel = MODEL_MAP[model] || model
-  return createAndPoll(ruxaModel, { prompt })
+  return createAndPollWithFallback(ruxaModel, { prompt })
 }
 
+// Edit gambar dengan prompt
 async function editImage({ prompt, imageBuffers, model }) {
   const ruxaModel = MODEL_MAP[model] || model
 
@@ -183,7 +176,7 @@ async function editImage({ prompt, imageBuffers, model }) {
   const input = { prompt, image_url: urls[0] }
   if (urls[1]) input.image_url_2 = urls[1]
 
-  return createAndPoll(ruxaModel, input)
+  return createAndPollWithFallback(ruxaModel, input)
 }
 
 module.exports = { generateImage, editImage }

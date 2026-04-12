@@ -41,43 +41,53 @@ function save(db) {
   }
 }
 
+// Normalisasi userId — hapus suffix device :12 agar key selalu konsisten
+// "6283866344919:12@s.whatsapp.net" → "6283866344919@s.whatsapp.net"
+// "213013684609202@lid"             → "213013684609202@lid" (tidak berubah)
+function normalizeId(userId) {
+  return (userId || "").replace(/:\d+(@)/, "$1")
+}
+
 function getTokens(userId) {
   const db = load()
-  return db[userId]?.tokens ?? 0
+  const id = normalizeId(userId)
+  return db[id]?.tokens ?? 0
 }
 
 function addTokens(userId, amount) {
   const db = load()
-  if (!db[userId]) {
-    db[userId] = { tokens: 0, totalBought: 0, history: [] }
+  const id = normalizeId(userId)
+  if (!db[id]) {
+    db[id] = { tokens: 0, totalBought: 0, history: [] }
   }
-  db[userId].tokens += amount
-  db[userId].totalBought = (db[userId].totalBought || 0) + amount
-  db[userId].history = db[userId].history || []
-  db[userId].history.push({
+  db[id].tokens += amount
+  db[id].totalBought = (db[id].totalBought || 0) + amount
+  db[id].history = db[id].history || []
+  db[id].history.push({
     type: "add",
     amount,
     timestamp: new Date().toISOString()
   })
   save(db)
-  return db[userId].tokens
+  return db[id].tokens
 }
 
 function useTokens(userId, amount) {
   const db = load()
-  const current = db[userId]?.tokens ?? 0
+  const id = normalizeId(userId)
+  const current = db[id]?.tokens ?? 0
   if (current < amount) return false
 
-  db[userId].tokens = current - amount
-  db[userId].history = db[userId].history || []
-  db[userId].history.push({
+  db[id].tokens = current - amount
+  db[id].history = db[id].history || []
+  db[id].history.push({
     type: "use",
     amount,
-    remaining: db[userId].tokens,
+    remaining: db[id].tokens,
     timestamp: new Date().toISOString()
   })
   save(db)
-  return db[userId].tokens
+  return db[id].tokens
 }
 
 function getTokenWarning(userId) {
