@@ -29,11 +29,15 @@ function cleanNumber(sender) {
 }
 
 function isOwner(sender) {
-  return cleanNumber(sender) === OWNER_NUMBER
+  const cleaned = cleanNumber(sender)
+  console.log(`[OWNER CHECK] sender raw: "${sender}" | cleaned: "${cleaned}" | OWNER_NUMBER: "${OWNER_NUMBER}" | match: ${cleaned === OWNER_NUMBER}`)
+  return cleaned === OWNER_NUMBER
 }
 
 function isAdmin(sender) {
-  return cleanNumber(sender) === ADMIN_NUMBER
+  const cleaned = cleanNumber(sender)
+  console.log(`[ADMIN CHECK] sender raw: "${sender}" | cleaned: "${cleaned}" | ADMIN_NUMBER: "${ADMIN_NUMBER}" | match: ${cleaned === ADMIN_NUMBER}`)
+  return cleaned === ADMIN_NUMBER
 }
 
 function isAdminOrOwner(sender) {
