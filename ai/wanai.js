@@ -1,147 +1,196 @@
 /**
- * wanai.js — Helper Swap Avatar Video via Ruxa AI
- * Menggunakan RUXA_API_KEY yang sama dengan veo3.1
+ * wanai.js — Helper Swap Avatar Video via Ruxa AI / AIVideoAPI
+ * Menggunakan AIVIDEO_API_KEY atau RUXA_API_KEY
  *
- * ENV yang dibutuhkan:
- *   RUXA_API_KEY — API Key dari ruxa.ai (sama dengan veo/sora)
+ * ENV yang dibutuhkan (salah satu):
+ *   AIVIDEO_API_KEY — API Key dari aivideoapi.com (prioritas)
+ *   RUXA_API_KEY    — API Key dari ruxa.ai (fallback)
  */
 
-const axios    = require("axios")
-const FormData = require("form-data")
+const axios = require("axios");
+const FormData = require("form-data");
 
-const RUXA_API_KEY = process.env.RUXA_API_KEY
-const BASE_URL     = "https://api.ruxa.ai/api/v1"
+const API_KEY = process.env.AIVIDEO_API_KEY || process.env.RUXA_API_KEY;
+const BASE_URL =
+  process.env.SWAP_API_BASE_URL ||
+  (process.env.AIVIDEO_API_KEY
+    ? "https://api.aivideoapi.com"
+    : "https://api.ruxa.ai/api/v1");
 
 function getHeaders() {
   return {
-    Authorization:  `Bearer ${RUXA_API_KEY}`,
-    "Content-Type": "application/json"
-  }
+    Authorization: `Bearer ${API_KEY}`,
+    "Content-Type": "application/json",
+  };
 }
 
-/**
- * Upload buffer (gambar/video) ke catbox.moe dan kembalikan URL publik
- */
 async function uploadToCatbox(buffer, filename, contentType) {
-  const form = new FormData()
-  form.append("reqtype", "fileupload")
-  form.append("fileToUpload", buffer, { filename, contentType })
+  const form = new FormData();
+  form.append("reqtype", "fileupload");
+  form.append("fileToUpload", buffer, { filename, contentType });
 
   const res = await axios.post("https://catbox.moe/user.php", form, {
-    headers:          form.getHeaders(),
-    timeout:          60000,
+    headers: form.getHeaders(),
+    timeout: 60000,
     maxContentLength: Infinity,
-    maxBodyLength:    Infinity
-  })
+    maxBodyLength: Infinity,
+  });
 
-  const url = res.data?.trim()
-  if (!url || !url.startsWith("http")) throw new Error("Gagal upload ke catbox.moe")
-  return url
+  const url = res.data?.trim();
+  if (!url || !url.startsWith("http"))
+    throw new Error("Gagal upload ke catbox.moe");
+  return url;
 }
 
 function translateError(msg, httpStatus) {
-  if (httpStatus === 401) return "RUXA_API_KEY tidak valid atau sudah kedaluwarsa"
-  if (httpStatus === 429) return "Terlalu banyak request ke Ruxa AI. Tunggu sebentar lalu coba lagi"
-  if (httpStatus === 404) return "Endpoint Ruxa AI tidak ditemukan (404). Coba lagi nanti"
-  if (httpStatus === 500) return "Server Ruxa AI sedang bermasalah (500). Coba lagi beberapa menit"
+  if (httpStatus === 401)
+    return "API Key tidak valid atau sudah kedaluwarsa. Periksa AIVIDEO_API_KEY / RUXA_API_KEY";
+  if (httpStatus === 402)
+    return "Kredit API habis. Top up di dashboard API provider";
+  if (httpStatus === 429)
+    return "Terlalu banyak request. Tunggu sebentar lalu coba lagi";
+  if (httpStatus === 404)
+    return "Endpoint API tidak ditemukan (404). Periksa koneksi dan API Key";
+  if (httpStatus === 500)
+    return "Server API sedang bermasalah (500). Coba lagi beberapa menit";
 
-  if (!msg) return "Terjadi kesalahan pada Ruxa AI"
+  if (!msg) return "Terjadi kesalahan pada API";
   if (msg.includes("积分不足")) {
-    const match = msg.match(/([\d.]+).*?([\d.]+)\s*积分/)
+    const match = msg.match(/([\d.]+).*?([\d.]+)\s*积分/);
     if (match) {
       return (
-        `Kredit Ruxa AI tidak mencukupi.\n\n` +
+        `Kredit API tidak mencukupi.\n\n` +
         `💰 Butuh: *${match[1]} kredit*\n` +
         `💳 Saldo sekarang: *${match[2]} kredit*\n\n` +
-        `Top up di: https://ruxa.ai/dashboard`
-      )
+        `Top up di dashboard API provider`
+      );
     }
-    return "Kredit Ruxa AI tidak mencukupi. Top up di https://ruxa.ai/dashboard"
+    return "Kredit API tidak mencukupi. Top up di dashboard API provider";
   }
   if (msg.includes("未找到支持模型") || msg.includes("渠道")) {
-    return "Model swap avatar tidak tersedia di akun Ruxa AI kamu. Cek https://ruxa.ai/dashboard"
+    return "Model swap avatar tidak tersedia. Cek dashboard API provider";
   }
-  return msg
+  return msg;
 }
 
-/**
- * Swap avatar (wajah) pada video menggunakan Ruxa AI
- * @param {Buffer} faceBuffer   - Buffer gambar wajah (foto sumber)
- * @param {Buffer} videoBuffer  - Buffer video target
- * @param {string} faceType     - Mime type gambar (default: image/jpeg)
- * @param {string} videoType    - Mime type video (default: video/mp4)
- * @returns {string} URL video hasil swap
- */
-async function swapAvatarVideo({ faceBuffer, videoBuffer, faceType = "image/jpeg", videoType = "video/mp4" }) {
-  if (!RUXA_API_KEY) throw new Error("RUXA_API_KEY belum diset di environment")
+async function swapAvatarVideo({
+  faceBuffer,
+  videoBuffer,
+  faceType = "image/jpeg",
+  videoType = "video/mp4",
+}) {
+  if (!API_KEY)
+    throw new Error(
+      "AIVIDEO_API_KEY atau RUXA_API_KEY belum diset di environment",
+    );
 
-  // Upload wajah & video ke catbox.moe secara paralel
   const [faceUrl, videoUrl] = await Promise.all([
-    uploadToCatbox(faceBuffer, "face.jpg",   faceType),
-    uploadToCatbox(videoBuffer, "video.mp4", videoType)
-  ])
+    uploadToCatbox(faceBuffer, "face.jpg", faceType),
+    uploadToCatbox(videoBuffer, "video.mp4", videoType),
+  ]);
 
-  // Buat task di Ruxa AI
-  let res
+  const createUrl = `${BASE_URL}/tasks/create`;
+  const pollUrlBase = `${BASE_URL}/tasks/query`;
+
+  let res;
   try {
     res = await axios.post(
-      `${BASE_URL}/tasks/create`,
+      createUrl,
       {
         model: "wan-ai/video-reface",
         input: {
           source_image: faceUrl,
-          target_video: videoUrl
-        }
+          target_video: videoUrl,
+        },
       },
-      { headers: getHeaders(), timeout: 30000 }
-    )
+      { headers: getHeaders(), timeout: 30000 },
+    );
   } catch (err) {
-    const status = err.response?.status
-    const msg    = err.response?.data?.message || err.response?.data?.error || err.message
-    if (status) throw new Error(translateError(msg, status))
-    throw new Error(`Koneksi ke Ruxa AI gagal: ${err.message}`)
+    const status = err.response?.status;
+    const msg =
+      err.response?.data?.message || err.response?.data?.error || err.message;
+
+    if (status === 404) {
+      throw new Error(
+        `Endpoint swap avatar tidak ditemukan (404).\n` +
+          `Base URL: ${BASE_URL}\n` +
+          `Pastikan API Key dan endpoint sudah benar.`,
+      );
+    }
+    if (status) throw new Error(translateError(msg, status));
+    throw new Error(`Koneksi ke API gagal: ${err.message}`);
   }
 
-  if (res.data?.code !== 200) {
-    throw new Error(translateError(res.data?.message))
+  const data = res.data;
+
+  if (data?.code && data.code !== 200) {
+    throw new Error(translateError(data?.message));
   }
 
-  const taskId = res.data?.data?.taskId
-  if (!taskId) throw new Error("Tidak ada task ID dari Ruxa AI")
+  const taskId = data?.data?.taskId || data?.uuid || data?.id || data?.task_id;
+  if (!taskId) {
+    if (data?.url || data?.video_url) return data.url || data.video_url;
+    throw new Error(
+      "Tidak ada task ID dari API. Response: " +
+        JSON.stringify(data).slice(0, 300),
+    );
+  }
 
-  // Polling tiap 6 detik, maks 5 menit (50x)
   for (let i = 0; i < 50; i++) {
-    await new Promise(r => setTimeout(r, 6000))
+    await new Promise((r) => setTimeout(r, 6000));
 
-    let queryRes
+    let queryRes;
     try {
-      queryRes = await axios.get(
-        `${BASE_URL}/tasks/query/${taskId}`,
-        { headers: getHeaders(), timeout: 15000 }
-      )
+      queryRes = await axios.get(`${pollUrlBase}/${taskId}`, {
+        headers: getHeaders(),
+        timeout: 15000,
+      });
     } catch (err) {
-      const status = err.response?.status
-      if (status === 404) throw new Error("Task tidak ditemukan di Ruxa AI. Coba generate ulang")
-      if (status === 401) throw new Error(translateError(null, 401))
-      continue
+      const status = err.response?.status;
+      if (status === 404)
+        throw new Error("Task tidak ditemukan. Coba generate ulang");
+      if (status === 401) throw new Error(translateError(null, 401));
+      console.log(`[wanai] Polling error (attempt ${i + 1}):`, err.message);
+      continue;
     }
 
-    const { state, resultJson } = queryRes.data?.data || {}
+    const taskData = queryRes.data?.data || queryRes.data || {};
+    const state = taskData.state || taskData.status || "";
+    const stateLower = state.toLowerCase();
 
-    if (state === "success") {
-      let parsed = {}
-      try { parsed = JSON.parse(resultJson || "{}") } catch {}
-      const url = parsed?.resultUrls?.[0]
-      if (!url) throw new Error("Video selesai tapi URL tidak ditemukan")
-      return url
+    if (
+      stateLower === "success" ||
+      stateLower === "succeeded" ||
+      stateLower === "completed"
+    ) {
+      let parsed = {};
+      try {
+        parsed = JSON.parse(taskData.resultJson || "{}");
+      } catch {}
+      const url =
+        parsed?.resultUrls?.[0] ||
+        taskData.url ||
+        taskData.video_url ||
+        taskData.resultUrl;
+      if (!url) throw new Error("Video selesai tapi URL tidak ditemukan");
+      return url;
     }
 
-    if (state === "fail") {
-      throw new Error("Ruxa AI gagal swap avatar. Coba dengan foto wajah yang lebih jelas")
+    if (
+      stateLower === "fail" ||
+      stateLower === "failed" ||
+      stateLower === "error"
+    ) {
+      throw new Error(
+        "API gagal swap avatar: " +
+          (taskData.error || taskData.message || state),
+      );
     }
   }
 
-  throw new Error("Timeout (5 menit) menunggu hasil dari Ruxa AI. Coba lagi nanti")
+  throw new Error(
+    "Timeout (5 menit) menunggu hasil swap avatar. Coba lagi nanti",
+  );
 }
 
-module.exports = { swapAvatarVideo, uploadToCatbox }
+module.exports = { swapAvatarVideo, uploadToCatbox };
