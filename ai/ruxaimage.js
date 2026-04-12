@@ -30,7 +30,6 @@ const MODEL_MAP = {
 }
 
 // Biaya token per model — sesuai harga kredit Ruxa AI
-// image
 const TOKEN_COST_MAP = {
   "nano-banana":      3,
   "nano-banana-2":    4,
@@ -49,10 +48,6 @@ const TOKEN_COST_MAP = {
   "veo-3.1":          18
 }
 
-/**
- * Ambil biaya token untuk model tertentu.
- * Cek nama lokal dulu, lalu nama resmi Ruxa, default 10.
- */
 function getModelTokenCost(model) {
   if (!model) return 10
   const key = model.toLowerCase()
@@ -62,7 +57,6 @@ function getModelTokenCost(model) {
   return 10
 }
 
-// Ambil API key — coba utama dulu, fallback ke backup
 function getApiKey(useBackup = false) {
   const key = useBackup
     ? process.env.RUXA_API_KEY_2
@@ -91,6 +85,12 @@ async function uploadToCatbox(buffer) {
   return url
 }
 
+function isInsufficientCredits(msg) {
+  if (!msg) return false
+  const m = msg.toLowerCase()
+  return m.includes("积分不足") || m.includes("insufficient") || m.includes("credit")
+}
+
 // Terjemahkan error dari Ruxa AI
 function translateError(msg, httpStatus) {
   if (httpStatus === 401) return "API Key Ruxa AI tidak valid atau kedaluwarsa"
@@ -99,26 +99,16 @@ function translateError(msg, httpStatus) {
   if (!msg) return "Terjadi kesalahan pada Ruxa AI"
 
   if (msg.includes("积分不足")) {
-    // Coba parse format: "需要X积分，余额Y积分" atau sejenisnya
-    // Cari semua angka dalam pesan
     const numbers = msg.match(/[\d.]+/g) || []
     const butuh  = numbers[0] ? parseFloat(numbers[0]) : null
     const saldo  = numbers[1] ? parseFloat(numbers[1]) : null
 
     if (butuh !== null && saldo !== null) {
-      // Jika butuh lebih besar dari harga model termurah (3),
-      // kemungkinan Ruxa punya minimum saldo yang harus dipertahankan
-      const isMinBalance = butuh >= 10 && saldo < butuh
-      const note = isMinBalance
-        ? `\n\n⚠️ Ruxa AI membutuhkan saldo minimal *${butuh} kredit* di akun kamu.\n` +
-          `Saldo kamu sekarang *${saldo} kredit* — silakan top up minimal *${butuh - saldo} kredit* lagi.`
-        : ""
       return (
         `Kredit Ruxa AI tidak cukup.\n` +
         `💰 Dibutuhkan: *${butuh} kredit*\n` +
-        `💳 Saldo kamu: *${saldo} kredit*` +
-        note +
-        `\n\n🔗 Top up: https://ruxa.ai/dashboard`
+        `💳 Saldo kamu: *${saldo} kredit*\n\n` +
+        `🔗 Top up: https://ruxa.ai/dashboard`
       )
     }
     return "Kredit Ruxa AI tidak cukup.\nSilakan top up di https://ruxa.ai/dashboard"
@@ -135,9 +125,39 @@ function translateError(msg, httpStatus) {
   return msg
 }
 
+// Cek saldo kredit Ruxa AI
+async function checkRuxaBalance(apiKey) {
+  try {
+    const res = await axios.get(
+      "https://api.ruxa.ai/api/v1/user/balance",
+      {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        timeout: 10000,
+        validateStatus: () => true
+      }
+    )
+    const balance = res.data?.data?.balance ?? res.data?.balance ?? null
+    if (balance !== null) return balance
+  } catch {}
+
+  try {
+    const res = await axios.get(
+      "https://api.ruxa.ai/v1/user/info",
+      {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        timeout: 10000,
+        validateStatus: () => true
+      }
+    )
+    const balance = res.data?.data?.balance ?? res.data?.data?.credit ?? null
+    if (balance !== null) return balance
+  } catch {}
+
+  return null
+}
+
 // Buat task & polling sampai selesai
 async function createAndPoll(ruxaModel, input, apiKey) {
-  // 1. Buat task
   let res
   try {
     res = await axios.post(
@@ -148,25 +168,35 @@ async function createAndPoll(ruxaModel, input, apiKey) {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json"
         },
-        timeout: 30000
+        timeout: 30000,
+        validateStatus: () => true
       }
     )
   } catch (err) {
-    const status = err.response?.status
-    if (status) throw new Error(translateError(err.response?.data?.message, status))
     throw new Error(`Koneksi ke Ruxa AI gagal: ${err.message}`)
   }
+
+  if (res.status === 401) throw new Error(translateError(null, 401))
+  if (res.status === 429) throw new Error(translateError(null, 429))
+  if (res.status === 500) throw new Error(translateError(null, 500))
 
   if (res.data?.code !== 200) {
     const rawMsg = res.data?.message || JSON.stringify(res.data)
     console.log(`[ruxaimage] Task creation gagal. Model: ${ruxaModel}, Code: ${res.data?.code}, Msg: ${rawMsg}`)
-    throw new Error(translateError(rawMsg))
+
+    if (isInsufficientCredits(rawMsg)) {
+      const err = new Error(translateError(rawMsg))
+      err.isInsufficientCredits = true
+      throw err
+    }
+
+    throw new Error(translateError(rawMsg, res.status))
   }
 
   const taskId = res.data?.data?.taskId
   if (!taskId) throw new Error("Tidak ada task ID dari Ruxa AI")
 
-  // 2. Polling tiap 4 detik, maks 2 menit (30x)
+  // Polling tiap 4 detik, maks 2 menit (30x)
   for (let i = 0; i < 30; i++) {
     await new Promise(r => setTimeout(r, 4000))
 
@@ -176,19 +206,19 @@ async function createAndPoll(ruxaModel, input, apiKey) {
         `${BASE_URL}/tasks/query/${taskId}`,
         {
           headers: { Authorization: `Bearer ${apiKey}` },
-          timeout: 10000
+          timeout: 10000,
+          validateStatus: () => true
         }
       )
-    } catch (err) {
-      const status = err.response?.status
-      if (status === 404) throw new Error("Task tidak ditemukan di Ruxa AI")
-      if (status === 401) throw new Error(translateError(null, 401))
-      continue // skip, coba lagi di iterasi berikutnya
+    } catch {
+      continue
     }
+
+    if (queryRes.status === 404) throw new Error("Task tidak ditemukan di Ruxa AI")
+    if (queryRes.status === 401) throw new Error(translateError(null, 401))
 
     const taskData = queryRes.data?.data || {}
     const { state, resultJson } = taskData
-    // Coba ambil alasan gagal dari berbagai field yang mungkin ada
     const failReason = taskData.failReason || taskData.errorMsg || taskData.error || taskData.message
 
     if (state === "success") {
@@ -200,8 +230,13 @@ async function createAndPoll(ruxaModel, input, apiKey) {
     }
 
     if (state === "fail") {
+      if (failReason && isInsufficientCredits(failReason)) {
+        const err = new Error(translateError(failReason))
+        err.isInsufficientCredits = true
+        throw err
+      }
       const reason = failReason ? translateError(failReason) : "Coba prompt yang berbeda atau ganti model"
-      console.log(`[ruxaimage] Task gagal. Model: ${ruxaModel}, Alasan: ${failReason || "(tidak ada)")`)
+      console.log(`[ruxaimage] Task gagal. Model: ${ruxaModel}, Alasan: ${failReason || "(tidak ada)"}`)
       throw new Error(`Ruxa AI gagal membuat gambar. ${reason}`)
     }
   }
@@ -216,13 +251,14 @@ async function createAndPollWithFallback(ruxaModel, input) {
   try {
     return await createAndPoll(ruxaModel, input, primaryKey)
   } catch (err) {
-    // Hanya fallback ke backup jika ada & error bukan dari prompt/model
     const backupKey = process.env.RUXA_API_KEY_2
-    const isKeyError = err.message.includes("tidak valid") ||
-                       err.message.includes("kedaluwarsa") ||
-                       err.message.includes("tidak cukup")
+    const shouldTryBackup =
+      backupKey &&
+      (err.message.includes("tidak valid") ||
+       err.message.includes("kedaluwarsa") ||
+       err.isInsufficientCredits)
 
-    if (backupKey && isKeyError) {
+    if (shouldTryBackup) {
       console.log("[ruxaimage] Primary key gagal, coba backup key...")
       return await createAndPoll(ruxaModel, input, backupKey)
     }
@@ -253,4 +289,12 @@ async function editImage({ prompt, imageBuffers, model }) {
   return createAndPollWithFallback(ruxaModel, input)
 }
 
-module.exports = { generateImage, editImage, getModelTokenCost, TOKEN_COST_MAP, MODEL_MAP }
+module.exports = {
+  generateImage,
+  editImage,
+  getModelTokenCost,
+  TOKEN_COST_MAP,
+  MODEL_MAP,
+  checkRuxaBalance,
+  isInsufficientCredits
+}
