@@ -5,7 +5,8 @@
 const fs   = require("fs")
 const path = require("path")
 
-const DB_PATH = path.resolve(__dirname, "../data/payments.json")
+const DATA_DIR = process.env.DATA_DIR || "/root/botdata"
+const DB_PATH  = path.join(DATA_DIR, "payments.json")
 
 function load() {
   if (!fs.existsSync(DB_PATH)) {

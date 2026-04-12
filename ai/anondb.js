@@ -6,7 +6,8 @@
 const fs   = require("fs")
 const path = require("path")
 
-const DB_PATH = path.join(__dirname, "../data/anon.json")
+const DATA_DIR = process.env.DATA_DIR || "/root/botdata"
+const DB_PATH  = path.join(DATA_DIR, "anon.json")
 
 // ─── LOAD / SAVE ──────────────────────────────────────
 function load() {

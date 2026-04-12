@@ -1,7 +1,10 @@
 const fs = require("fs")
 const path = require("path")
 
-const DB_PATH = path.resolve(__dirname, "../data/tokens.json")
+// DATA_DIR → folder permanen di luar project (tidak tertimpa saat deploy ulang)
+// Set env DATA_DIR di Railway/VPS jika mau path lain. Default: /root/botdata
+const DATA_DIR = process.env.DATA_DIR || "/root/botdata"
+const DB_PATH  = path.join(DATA_DIR, "tokens.json")
 
 const LOW_TOKEN_THRESHOLD = 3
 
