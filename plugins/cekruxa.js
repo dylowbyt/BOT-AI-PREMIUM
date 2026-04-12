@@ -8,7 +8,7 @@
  */
 
 const axios = require("axios")
-const { checkRuxaBalance } = require("../ai/ruxaimage")
+const { checkRuxaBalance, parseCreditNumbers } = require("../ai/ruxaimage")
 
 const CANDIDATES = [
   "nano-banana",
@@ -126,14 +126,15 @@ module.exports = {
 
         const msgLower = message.toLowerCase()
         if (msgLower.includes("积分不足") || msgLower.includes("insufficient") || msgLower.includes("credit")) {
-          const nums = message.match(/[\d.]+/g) || []
+          const { butuh, saldo } = parseCreditNumbers(message)
           return sock.sendMessage(from, {
             text:
               `💳 *Model ADA tapi kredit tidak cukup!*\n\n` +
               `🤖 Model: *${modelId}* — model ini valid\n` +
-              `💰 Dibutuhkan: *${nums[0] || "?"} kredit*\n` +
-              `💳 Saldo kamu: *${nums[1] || "?"} kredit*\n\n` +
-              `🔗 Top up: https://ruxa.ai/dashboard`
+              `💰 Dibutuhkan: *${butuh !== null ? butuh : "?"} kredit*\n` +
+              `💳 Saldo kamu: *${saldo !== null ? saldo : "?"} kredit*\n\n` +
+              `🔗 Top up: https://ruxa.ai/dashboard\n\n` +
+              `📝 _Pesan asli Ruxa: ${message}_`
           })
         }
 
@@ -197,8 +198,8 @@ module.exports = {
         msgLower.includes("insufficient") ||
         msgLower.includes("credit")
       ) {
-        const nums = message.match(/[\d.]+/g) || []
-        creditFail.push({ id: modelId, butuh: nums[0] || "?", saldo: nums[1] || "?" })
+        const { butuh: bCredit, saldo: sSaldo } = parseCreditNumbers(message)
+        creditFail.push({ id: modelId, butuh: bCredit !== null ? bCredit : "?", saldo: sSaldo !== null ? sSaldo : "?", raw: message })
       } else if (
         msgLower.includes("未找到") ||
         msgLower.includes("渠道") ||
@@ -227,6 +228,7 @@ module.exports = {
       report += `💳 *MODEL ADA tapi kredit kurang (${creditFail.length}):*\n`
       creditFail.forEach(m => {
         report += `• \`${m.id}\` — butuh ${m.butuh} kredit (saldo: ${m.saldo})\n`
+        report += `  📝 _Pesan Ruxa: ${m.raw}_\n`
       })
       report += `\n📌 Model-model ini VALID, tinggal top up kredit!\n🔗 https://ruxa.ai/dashboard\n\n`
     }
