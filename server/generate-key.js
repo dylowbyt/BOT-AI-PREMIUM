@@ -1,6 +1,12 @@
-function generateKey() {
-  const part = () => Math.random().toString(36).substring(2, 7).toUpperCase();
-  return `XYA-${part()}-${part()}`;
+const crypto = require('crypto')
+
+function generateLicense(name = 'USER') {
+    const random = crypto.randomBytes(3).toString('hex').toUpperCase()
+    const time = Date.now().toString().slice(-4)
+
+    return `XYA-${name.toUpperCase()}-${time}-${random}`
 }
 
-console.log("Generated Key:", generateKey());
+// contoh pakai
+const key = generateLicense('ANDI')
+console.log(key)
