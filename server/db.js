@@ -1,16 +1,15 @@
-// Simulasi database (ganti ke MongoDB nanti)
-const licenses = [];
+const fs = require('fs')
+const path = './data/license.json'
 
-function addLicense(key, expires) {
-  licenses.push({
-    key,
-    active: true,
-    expires
-  });
+function loadDB() {
+    if (!fs.existsSync(path)) {
+        fs.writeFileSync(path, '{}')
+    }
+    return JSON.parse(fs.readFileSync(path))
 }
 
-function getLicense(key) {
-  return licenses.find(l => l.key === key);
+function saveDB(data) {
+    fs.writeFileSync(path, JSON.stringify(data, null, 2))
 }
 
-module.exports = { licenses, addLicense, getLicense };
+module.exports = { loadDB, saveDB }
