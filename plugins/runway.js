@@ -88,10 +88,10 @@ async function handleRunway(sock, m, args, command) {
 
   try {
     const videoUrl = await generateVideo({
-      prompt: prompt,
-      model: model.key,
-      duration: 5,
-      aspect_ratio: aspect_ratio
+      prompt:    prompt,
+      modelKey:  model.key,
+      duration:  5,
+      ratio:     aspect_ratio
     })
 
     if (!videoUrl) throw new Error("Video URL kosong dari API")
