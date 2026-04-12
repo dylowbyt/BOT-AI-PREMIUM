@@ -91,6 +91,50 @@ function isInsufficientCredits(msg) {
   return m.includes("积分不足") || m.includes("insufficient") || m.includes("credit")
 }
 
+// Parse angka kredit dari pesan error Ruxa AI
+// Contoh pesan: "积分不足，需要3.00积分，当前余额2.00" atau
+//               "积分不足,need 3 credits,current balance 2"
+function parseCreditNumbers(msg) {
+  let butuh = null
+  let saldo = null
+
+  // Coba match: "需要X" atau "need X" atau "consume X" (angka yang dibutuhkan)
+  const butuhMatch =
+    msg.match(/需要\s*([\d.]+)/) ||
+    msg.match(/消耗\s*([\d.]+)/) ||
+    msg.match(/need[s]?\s*([\d.]+)/i) ||
+    msg.match(/require[s]?\s*([\d.]+)/i) ||
+    msg.match(/cost[s]?\s*([\d.]+)/i)
+
+  // Coba match: "当前X" atau "余额X" atau "balance X" atau "current X" (saldo)
+  const saldoMatch =
+    msg.match(/当前[余额]?\s*([\d.]+)/) ||
+    msg.match(/余额\s*([\d.]+)/) ||
+    msg.match(/balance[:\s]*([\d.]+)/i) ||
+    msg.match(/current[:\s]*([\d.]+)/i) ||
+    msg.match(/have[:\s]*([\d.]+)/i)
+
+  if (butuhMatch) butuh = parseFloat(butuhMatch[1])
+  if (saldoMatch) saldo = parseFloat(saldoMatch[1])
+
+  // Fallback: ambil semua angka dan coba urutan mana yang masuk akal
+  if (butuh === null || saldo === null) {
+    const allNums = (msg.match(/[\d.]+/g) || []).map(parseFloat)
+    // Filter angka yang wajar (kredit antara 0-9999)
+    const validNums = allNums.filter(n => n >= 0 && n < 9999)
+    if (validNums.length >= 2 && butuh === null && saldo === null) {
+      // Biasanya urutan: saldo lebih kecil, butuh lebih besar
+      const sorted = [...validNums].sort((a, b) => a - b)
+      saldo = sorted[0]
+      butuh = sorted[sorted.length - 1]
+    } else if (validNums.length === 1) {
+      if (butuh === null) butuh = validNums[0]
+    }
+  }
+
+  return { butuh, saldo }
+}
+
 // Terjemahkan error dari Ruxa AI
 function translateError(msg, httpStatus) {
   if (httpStatus === 401) return "API Key Ruxa AI tidak valid atau kedaluwarsa"
@@ -99,19 +143,14 @@ function translateError(msg, httpStatus) {
   if (!msg) return "Terjadi kesalahan pada Ruxa AI"
 
   if (msg.includes("积分不足")) {
-    const numbers = msg.match(/[\d.]+/g) || []
-    const butuh  = numbers[0] ? parseFloat(numbers[0]) : null
-    const saldo  = numbers[1] ? parseFloat(numbers[1]) : null
+    const { butuh, saldo } = parseCreditNumbers(msg)
 
-    if (butuh !== null && saldo !== null) {
-      return (
-        `Kredit Ruxa AI tidak cukup.\n` +
-        `💰 Dibutuhkan: *${butuh} kredit*\n` +
-        `💳 Saldo kamu: *${saldo} kredit*\n\n` +
-        `🔗 Top up: https://ruxa.ai/dashboard`
-      )
-    }
-    return "Kredit Ruxa AI tidak cukup.\nSilakan top up di https://ruxa.ai/dashboard"
+    let result = `Kredit Ruxa AI tidak cukup.\n`
+    if (butuh !== null) result += `💰 Dibutuhkan: *${butuh} kredit*\n`
+    if (saldo !== null) result += `💳 Saldo kamu: *${saldo} kredit*\n`
+    result += `\n🔗 Top up: https://ruxa.ai/dashboard`
+    result += `\n\n📝 _Pesan asli Ruxa: ${msg}_`
+    return result
   }
 
   if (msg.includes("未找到支持模型") || msg.includes("渠道")) {
