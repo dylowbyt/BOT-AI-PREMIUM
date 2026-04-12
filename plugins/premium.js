@@ -25,7 +25,7 @@ const SNAP_BASE_URL       = IS_SANDBOX
   ? "https://app.sandbox.midtrans.com/snap/v1"
   : "https://app.midtrans.com/snap/v1"
 
-const ADMIN_NUMBER = process.env.ADMIN_NUMBER || "6281234567890"
+const ADMIN_NUMBER = process.env.ADMIN_NUMBER || "6283866344919"
 
 const PACKAGES = {
   basic:  { tokens: 20,  price: 10000, label: "Basic"  },
@@ -178,6 +178,8 @@ module.exports = {
           `🎞️ .runway        — 12 token  (Runway Gen3)\n` +
           `🎬 .veo3          — 16 token  (Google Veo 3)\n` +
           `🎥 .veo31         — 18 token  (Google Veo 3.1)\n\n` +
+          `🔄 *SWAP AVATAR:*\n` +
+          `🧑 .swapavatar    — 23 token  (Ruxa AI Face Swap)\n\n` +
           `━━━━━━━━━━━━━━━━━━━━\n` +
           `📝 Ketik: *.buy basic* / *.buy medium* / *.buy pro* / *.tutorial*`
       })
