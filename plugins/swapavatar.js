@@ -1,5 +1,5 @@
 /**
- * swapavatar.js — Swap avatar/wajah ke video menggunakan Wan AI
+ * swapavatar.js — Swap avatar/wajah ke video menggunakan AI
  *
  * Cara pakai:
  *   Cara 1: Kirim FOTO wajah + reply ke VIDEO target
@@ -10,12 +10,12 @@
  * Biaya: 23 token per swap
  *
  * ENV yang dibutuhkan:
- *   WAN_API_KEY — API Key dari Wan AI
+ *   AIVIDEO_API_KEY atau RUXA_API_KEY
  */
 
 const { downloadMediaMessage } = require("@whiskeysockets/baileys")
 const { swapAvatarVideo }      = require("../ai/wanai")
-const { useTokens, getTokens, getTokenWarning } = require("../ai/tokendb")
+const { useTokens, getTokens, addTokens, getTokenWarning } = require("../ai/tokendb")
 
 const TOKEN_COST = 23
 
@@ -27,7 +27,6 @@ module.exports = {
     const from   = m.key.remoteJid
     const sender = m.key.participant || m.key.remoteJid
 
-    // ─── BANTUAN ────────────────────────────────────────────────
     if (!m.message) return
 
     const msg        = m.message
@@ -41,12 +40,11 @@ module.exports = {
     const hasImg = !!(directImg || quotedImg)
     const hasVid = !!(directVid || quotedVid)
 
-    // Kalau tidak ada media sama sekali → tampilkan panduan
     if (!hasImg && !hasVid) {
       return sock.sendMessage(from, {
         text:
           `🔄 *SWAP AVATAR VIDEO — .swapavatar*\n\n` +
-          `Fitur ini mengganti wajah dalam video dengan wajah dari foto kamu menggunakan Wan AI.\n\n` +
+          `Fitur ini mengganti wajah dalam video dengan wajah dari foto kamu menggunakan AI.\n\n` +
           `━━━━━━━━━━━━━━━━━━━━\n` +
           `📋 *CARA PAKAI:*\n\n` +
           `*Cara 1:*\n` +
@@ -66,7 +64,6 @@ module.exports = {
       })
     }
 
-    // ─── VALIDASI: harus ada KEDUANYA (foto + video) ────────────
     if (hasImg && !hasVid) {
       return sock.sendMessage(from, {
         text:
@@ -83,7 +80,6 @@ module.exports = {
       })
     }
 
-    // ─── CEK TOKEN ──────────────────────────────────────────────
     const tokens = getTokens(sender)
     if (tokens < TOKEN_COST) {
       return sock.sendMessage(from, {
@@ -95,24 +91,21 @@ module.exports = {
       })
     }
 
-    // ─── NOTIF PROSES ───────────────────────────────────────────
     await sock.sendMessage(from, {
       text:
         `🔄 *Memproses Swap Avatar...*\n\n` +
         `⬆️ Mengupload foto & video...\n` +
-        `🤖 Ruxa AI sedang memproses...\n\n` +
+        `🤖 AI sedang memproses...\n\n` +
         `⏳ Proses biasanya 2-5 menit.\n` +
         `🪙 *${TOKEN_COST} token* akan dipotong.`
     })
 
-    // ─── DOWNLOAD MEDIA ─────────────────────────────────────────
     let faceBuffer  = null
     let videoBuffer = null
     let faceType    = "image/jpeg"
     let videoType   = "video/mp4"
 
     try {
-      // Tentukan arah: foto dari direct atau quoted
       if (directImg) {
         faceBuffer = await downloadMediaMessage(m, "buffer", {}, { logger: console, reuploadRequest: sock.updateMediaMessage })
         faceType   = directImg.mimetype || "image/jpeg"
@@ -125,7 +118,6 @@ module.exports = {
         faceType = quotedImg.mimetype || "image/jpeg"
       }
 
-      // Video dari direct atau quoted
       if (directVid) {
         videoBuffer = await downloadMediaMessage(m, "buffer", {}, { logger: console, reuploadRequest: sock.updateMediaMessage })
         videoType   = directVid.mimetype || "video/mp4"
@@ -151,7 +143,6 @@ module.exports = {
       })
     }
 
-    // ─── POTONG TOKEN & PROSES ──────────────────────────────────
     const remaining = useTokens(sender, TOKEN_COST)
 
     try {
@@ -166,18 +157,15 @@ module.exports = {
         video:   { url: resultUrl },
         caption:
           `✅ *Swap Avatar Berhasil!*\n\n` +
-          `🤖 Powered by: *Ruxa AI (veo3.1)*\n` +
+          `🤖 Powered by: *AI Face Swap*\n` +
           `🪙 Token terpakai: *${TOKEN_COST}*\n` +
           `💰 Sisa token: *${remaining}*`
       })
 
-      // Peringatan token menipis
       const warning = getTokenWarning(sender)
       if (warning) await sock.sendMessage(from, { text: warning })
 
     } catch (err) {
-      // Kembalikan token kalau error
-      const { addTokens } = require("../ai/tokendb")
       addTokens(sender, TOKEN_COST)
 
       console.log("[swapavatar] ERROR:", err.message)
