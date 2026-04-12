@@ -5,16 +5,29 @@
 const fs   = require("fs")
 const path = require("path")
 
-const DATA_DIR = process.env.DATA_DIR || "/root/botdata"
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "../data")
 const DB_PATH  = path.join(DATA_DIR, "payments.json")
 
-function load() {
-  if (!fs.existsSync(DB_PATH)) {
-    fs.mkdirSync(path.dirname(DB_PATH), { recursive: true })
-    fs.writeFileSync(DB_PATH, JSON.stringify([]))
-    return []
-  }
+function initFile() {
   try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true })
+      console.log("[paymentdb] Folder dibuat:", DATA_DIR)
+    }
+    if (!fs.existsSync(DB_PATH)) {
+      fs.writeFileSync(DB_PATH, JSON.stringify([], null, 2))
+      console.log("[paymentdb] File dibuat:", DB_PATH)
+    }
+  } catch (e) {
+    console.error("[paymentdb] Gagal init file:", e.message)
+  }
+}
+
+initFile()
+
+function load() {
+  try {
+    initFile()
     return JSON.parse(fs.readFileSync(DB_PATH, "utf8"))
   } catch {
     return []
@@ -22,7 +35,12 @@ function load() {
 }
 
 function save(data) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2))
+  try {
+    initFile()
+    fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2))
+  } catch (e) {
+    console.error("[paymentdb] Gagal save:", e.message)
+  }
 }
 
 function addPendingPayment({ reference, userId, tokens, amount, expiredAt }) {

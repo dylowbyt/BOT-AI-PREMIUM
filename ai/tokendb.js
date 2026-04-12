@@ -1,20 +1,31 @@
 const fs = require("fs")
 const path = require("path")
 
-// DATA_DIR → folder permanen di luar project (tidak tertimpa saat deploy ulang)
-// Set env DATA_DIR di Railway/VPS jika mau path lain. Default: /root/botdata
-const DATA_DIR = process.env.DATA_DIR || "/root/botdata"
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "../data")
 const DB_PATH  = path.join(DATA_DIR, "tokens.json")
 
 const LOW_TOKEN_THRESHOLD = 3
 
-function load() {
-  if (!fs.existsSync(DB_PATH)) {
-    fs.mkdirSync(path.dirname(DB_PATH), { recursive: true })
-    fs.writeFileSync(DB_PATH, JSON.stringify({}))
-    return {}
-  }
+function initFile() {
   try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true })
+      console.log("[tokendb] Folder dibuat:", DATA_DIR)
+    }
+    if (!fs.existsSync(DB_PATH)) {
+      fs.writeFileSync(DB_PATH, JSON.stringify({}, null, 2))
+      console.log("[tokendb] File dibuat:", DB_PATH)
+    }
+  } catch (e) {
+    console.error("[tokendb] Gagal init file:", e.message)
+  }
+}
+
+initFile()
+
+function load() {
+  try {
+    initFile()
     return JSON.parse(fs.readFileSync(DB_PATH, "utf8"))
   } catch {
     return {}
@@ -22,7 +33,12 @@ function load() {
 }
 
 function save(db) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2))
+  try {
+    initFile()
+    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2))
+  } catch (e) {
+    console.error("[tokendb] Gagal save:", e.message)
+  }
 }
 
 function getTokens(userId) {
