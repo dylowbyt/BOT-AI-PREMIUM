@@ -16,7 +16,6 @@
 const { generateImage, getModelTokenCost } = require("../ai/ruxaimage")
 const { useTokens, getTokens, addTokens, getTokenWarning } = require("../ai/tokendb")
 
-// Model yang tersedia untuk generate image (bukan video)
 const IMAGE_MODELS = [
   { key: "nano-banana",      label: "Nano Banana",      cost: 3  },
   { key: "nano-banana-2",    label: "Nano Banana 2",    cost: 4  },
@@ -43,7 +42,6 @@ module.exports = {
     const from   = m.key.remoteJid
     const sender = m.key.participant || m.key.remoteJid
 
-    // .imgai list → tampilkan semua model & harga
     if (args[0]?.toLowerCase() === "list" || args[0]?.toLowerCase() === "models") {
       return sock.sendMessage(from, {
         text:
@@ -59,11 +57,9 @@ module.exports = {
       })
     }
 
-    // Tentukan model & prompt
     let model = DEFAULT_MODEL
     let promptParts = args
 
-    // Cek apakah args[0] adalah nama model yang dikenal
     const knownModelKeys = IMAGE_MODELS.map(m => m.key)
     const firstArg = (args[0] || "").toLowerCase()
 
@@ -74,7 +70,6 @@ module.exports = {
 
     const prompt = promptParts.join(" ").trim()
 
-    // Tampilkan menu jika tidak ada prompt
     if (!prompt) {
       return sock.sendMessage(from, {
         text:
@@ -94,10 +89,8 @@ module.exports = {
       })
     }
 
-    // Ambil biaya token yang benar untuk model ini
     const TOKEN_COST = getModelTokenCost(model)
 
-    // Cek saldo token
     const tokens = getTokens(sender)
     if (tokens < TOKEN_COST) {
       const modelInfo = IMAGE_MODELS.find(m => m.key === model)
@@ -112,7 +105,6 @@ module.exports = {
       })
     }
 
-    // Notifikasi proses
     const modelInfo = IMAGE_MODELS.find(m => m.key === model)
     await sock.sendMessage(from, {
       text:
@@ -124,7 +116,6 @@ module.exports = {
     })
 
     try {
-      // Potong token SEBELUM generate (dikembalikan jika gagal)
       const remaining = useTokens(sender, TOKEN_COST)
 
       const imageUrl = await generateImage({ prompt, model })
@@ -143,7 +134,6 @@ module.exports = {
       if (warning) await sock.sendMessage(from, { text: warning })
 
     } catch (err) {
-      // Kembalikan token jika gagal
       addTokens(sender, TOKEN_COST)
       console.log("[imgai] ERROR:", err.message)
 

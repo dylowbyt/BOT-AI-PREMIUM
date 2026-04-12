@@ -9,12 +9,6 @@
  *   .gptimg <prompt>    → GPT Image 1.5        (8 token)
  *   .gpt4o <prompt>     → GPT-4o Image         (10 token)
  *
- * Cara pakai 2 foto:
- *   1. Kirim foto pertama sebagai lampiran pesan command
- *   2. Sambil reply ke pesan yang berisi foto kedua
- *   Contoh: reply foto kucing → ketik ".nanoedit satukan dua foto ini jadi satu"
- *           sambil lampirkan foto anjing
- *
  * ENV yang dibutuhkan:
  *   RUXA_API_KEY — API Key dari ruxa.ai
  */
@@ -32,17 +26,10 @@ const IMAGE_MODELS = {
   gpt4o:    { model: "gpt-4o",           label: "GPT-4o Image",      cost: 10, isEdit: false, canEdit: false, emoji: "🧠" }
 }
 
-/**
- * Download semua gambar dari pesan:
- * - Foto yang dilampirkan langsung ke pesan command
- * - Foto dari pesan yang di-reply
- * Mengembalikan array buffer (0, 1, atau 2 gambar)
- */
 async function downloadImages(sock, m) {
   const { downloadMediaMessage } = require("@whiskeysockets/baileys")
   const buffers = []
 
-  // 1. Foto yang dilampirkan langsung ke pesan command
   if (m.message?.imageMessage) {
     try {
       const buf = await downloadMediaMessage(m, "buffer", {})
@@ -50,7 +37,6 @@ async function downloadImages(sock, m) {
     } catch {}
   }
 
-  // 2. Foto dari pesan yang di-reply
   const quotedMsg = m.message?.extendedTextMessage?.contextInfo?.quotedMessage
   if (quotedMsg?.imageMessage) {
     try {
@@ -63,7 +49,7 @@ async function downloadImages(sock, m) {
     } catch {}
   }
 
-  return buffers // max 2 gambar
+  return buffers
 }
 
 async function handleImgGen(sock, m, args, command) {
@@ -73,15 +59,12 @@ async function handleImgGen(sock, m, args, command) {
 
   if (!model) return
 
-  // ── MODE EDIT (isEdit: true atau canEdit: true dengan ada foto) ──────────
   const doEdit = model.isEdit || model.canEdit
 
   if (doEdit) {
-    // Cek dulu apakah ada gambar
     const imageBuffers = await downloadImages(sock, m)
     const hasImages = imageBuffers.length > 0
 
-    // Kalau model wajib edit (isEdit) tapi tidak ada gambar → tampilkan cara pakai
     if (model.isEdit && !hasImages) {
       if (!args || args.length === 0) {
         return sock.sendMessage(from, {
@@ -105,11 +88,9 @@ async function handleImgGen(sock, m, args, command) {
       })
     }
 
-    // Kalau canEdit tapi tidak ada gambar → lanjut ke text-to-image di bawah
     if (model.canEdit && !hasImages && !model.isEdit) {
-      // Fall through ke text-to-image
+      // lanjut ke text-to-image
     } else if (hasImages) {
-      // ── JALANKAN EDIT ──────────────────────────────────────────────────
       if (!args || args.length === 0) {
         return sock.sendMessage(from, {
           text:

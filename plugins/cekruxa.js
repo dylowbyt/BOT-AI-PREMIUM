@@ -2,27 +2,19 @@
  * cekruxa.js — Diagnostic: test model IDs langsung ke Ruxa API
  *
  * Commands:
- *   .cekruxa         → auto-test semua kemungkinan nama model nano/gpt
+ *   .cekruxa         → auto-test semua model & cek saldo kredit
  *   .testmodel <id>  → test apakah model ID tertentu bisa digunakan
+ *   .ruxastatus      → cek saldo kredit Ruxa AI
  */
 
 const axios = require("axios")
+const { checkRuxaBalance } = require("../ai/ruxaimage")
 
-// Daftar model yang ingin kita cari nama yang benar
 const CANDIDATES = [
-  // Nano Banana Basic — kemungkinan nama API
   "nano-banana",
-  "nano-banana-basic",
-  "nano-banana-1",
-  "nano-banana-v1",
-  "banana",
-  "nano",
-  "nanoBanana",
-  "nano_banana",
-  // Nano Banana 2
   "nano-banana-2",
-  "nano-banana-2-v2",
-  // GPT Image
+  "nano-banana-pro",
+  "nano-banana-edit",
   "gpt-image-1",
   "gpt-image-1-5",
   "gpt-image-1.5",
@@ -42,7 +34,8 @@ async function testModel(apiKey, modelId) {
         Authorization:  `Bearer ${apiKey}`,
         "Content-Type": "application/json"
       },
-      timeout: 15000
+      timeout: 15000,
+      validateStatus: () => true
     }
   )
   return res.data
@@ -50,7 +43,7 @@ async function testModel(apiKey, modelId) {
 
 module.exports = {
   name:  "cekruxa",
-  alias: ["testmodel"],
+  alias: ["testmodel", "ruxastatus"],
 
   async run(sock, m, args) {
     const from    = m.key.remoteJid
@@ -66,6 +59,38 @@ module.exports = {
       return sock.sendMessage(from, {
         text: "❌ RUXA_API_KEY belum diset di environment."
       })
+    }
+
+    // ── .ruxastatus → cek saldo saja ──────────────────────────────
+    if (command === "ruxastatus") {
+      await sock.sendMessage(from, {
+        text: `🔍 *Mengecek saldo akun Ruxa AI...*`
+      })
+
+      const balance = await checkRuxaBalance(apiKey)
+      let msg = `🤖 *STATUS AKUN RUXA AI*\n━━━━━━━━━━━━━━━━━━━━\n\n`
+
+      if (balance !== null) {
+        msg += `💰 *Saldo Kredit:* ${balance}\n\n`
+        if (balance < 3) {
+          msg +=
+            `⚠️ *KREDIT TIDAK CUKUP!*\n` +
+            `Model termurah (nano-banana) butuh *3 kredit*.\n` +
+            `Saldo kamu hanya *${balance} kredit*.\n\n`
+        } else {
+          msg += `✅ Saldo mencukupi untuk generate gambar.\n\n`
+        }
+      } else {
+        msg += `💰 *Saldo:* Tidak bisa dicek via API (coba cek manual di dashboard)\n\n`
+      }
+
+      msg +=
+        `🔑 API Key: ...${apiKey.slice(-6)}\n` +
+        `🔑 Backup Key: ${process.env.RUXA_API_KEY_2 ? "✅ Ada" : "❌ Tidak ada"}\n\n` +
+        `🔗 Top up kredit: https://ruxa.ai/dashboard\n` +
+        `📝 Test semua model: *.cekruxa*`
+
+      return sock.sendMessage(from, { text: msg })
     }
 
     // ── .testmodel <id> ──────────────────────────────────────────
@@ -99,6 +124,19 @@ module.exports = {
           })
         }
 
+        const msgLower = message.toLowerCase()
+        if (msgLower.includes("积分不足") || msgLower.includes("insufficient") || msgLower.includes("credit")) {
+          const nums = message.match(/[\d.]+/g) || []
+          return sock.sendMessage(from, {
+            text:
+              `💳 *Model ADA tapi kredit tidak cukup!*\n\n` +
+              `🤖 Model: *${modelId}* — model ini valid\n` +
+              `💰 Dibutuhkan: *${nums[0] || "?"} kredit*\n` +
+              `💳 Saldo kamu: *${nums[1] || "?"} kredit*\n\n` +
+              `🔗 Top up: https://ruxa.ai/dashboard`
+          })
+        }
+
         return sock.sendMessage(from, {
           text:
             `❌ *Model gagal / tidak ditemukan*\n\n` +
@@ -120,54 +158,62 @@ module.exports = {
       }
     }
 
-    // ── .cekruxa → auto-test semua kandidat nama model ──────────
+    // ── .cekruxa → cek saldo + auto-test semua model ──────────
     await sock.sendMessage(from, {
       text:
-        `🔍 *Auto-testing ${CANDIDATES.length} model name candidates...*\n` +
-        `Mohon tunggu, ini mungkin butuh ~30 detik.`
+        `🔍 *Mengecek Ruxa AI...*\n` +
+        `Cek saldo & test ${CANDIDATES.length} model. Mohon tunggu ~30 detik.`
     })
 
-    const working   = []
-    const notFound  = []
-    const otherFail = []
+    const balance = await checkRuxaBalance(apiKey)
+
+    let balanceInfo = ""
+    if (balance !== null) {
+      balanceInfo = `💰 *Saldo Kredit Ruxa:* ${balance}\n\n`
+      if (balance < 3) {
+        balanceInfo +=
+          `⚠️ *KREDIT TIDAK CUKUP!*\n` +
+          `Model termurah butuh *3 kredit*, saldo kamu *${balance}*.\n` +
+          `🔗 Top up dulu: https://ruxa.ai/dashboard\n\n`
+      }
+    }
+
+    const working    = []
+    const notFound   = []
+    const creditFail = []
+    const otherFail  = []
 
     for (const modelId of CANDIDATES) {
-      try {
-        const result  = await testModel(apiKey, modelId)
-        const code    = result?.code
-        const message = (result?.message || "").toLowerCase()
-        const taskId  = result?.data?.taskId
+      const result  = await testModel(apiKey, modelId)
+      const code    = result?.code
+      const message = result?.message || ""
+      const msgLower = message.toLowerCase()
+      const taskId  = result?.data?.taskId
 
-        if (taskId) {
-          // Task berhasil dibuat → model ID ini valid!
-          working.push({ id: modelId, taskId })
-        } else if (
-          message.includes("未找到") ||
-          message.includes("渠道") ||
-          message.includes("not found") ||
-          message.includes("not support") ||
-          code === 404
-        ) {
-          notFound.push({ id: modelId, msg: result?.message })
-        } else {
-          otherFail.push({ id: modelId, code, msg: result?.message })
-        }
-      } catch (err) {
-        const rawMsg = (err.response?.data?.message || err.message || "").toLowerCase()
-        if (
-          rawMsg.includes("未找到") ||
-          rawMsg.includes("渠道") ||
-          rawMsg.includes("not found") ||
-          rawMsg.includes("not support")
-        ) {
-          notFound.push({ id: modelId, msg: err.response?.data?.message || err.message })
-        } else {
-          otherFail.push({ id: modelId, msg: err.response?.data?.message || err.message })
-        }
+      if (taskId) {
+        working.push({ id: modelId })
+      } else if (
+        msgLower.includes("积分不足") ||
+        msgLower.includes("insufficient") ||
+        msgLower.includes("credit")
+      ) {
+        const nums = message.match(/[\d.]+/g) || []
+        creditFail.push({ id: modelId, butuh: nums[0] || "?", saldo: nums[1] || "?" })
+      } else if (
+        msgLower.includes("未找到") ||
+        msgLower.includes("渠道") ||
+        msgLower.includes("not found") ||
+        msgLower.includes("not support") ||
+        code === 404
+      ) {
+        notFound.push({ id: modelId })
+      } else {
+        otherFail.push({ id: modelId, code, msg: message.slice(0, 60) })
       }
     }
 
     let report = `🤖 *HASIL CEK MODEL RUXA AI*\n━━━━━━━━━━━━━━━━━━━━\n\n`
+    report += balanceInfo
 
     if (working.length > 0) {
       report += `✅ *MODEL VALID (task berhasil dibuat):*\n`
@@ -177,21 +223,30 @@ module.exports = {
       report += `❌ Tidak ada model yang berhasil buat task.\n\n`
     }
 
+    if (creditFail.length > 0) {
+      report += `💳 *MODEL ADA tapi kredit kurang (${creditFail.length}):*\n`
+      creditFail.forEach(m => {
+        report += `• \`${m.id}\` — butuh ${m.butuh} kredit (saldo: ${m.saldo})\n`
+      })
+      report += `\n📌 Model-model ini VALID, tinggal top up kredit!\n🔗 https://ruxa.ai/dashboard\n\n`
+    }
+
     if (otherFail.length > 0) {
-      report += `⚠️ *MODEL ADA tapi gagal (perlu investigasi):*\n`
+      report += `⚠️ *ERROR LAIN (perlu investigasi):*\n`
       otherFail.forEach(m => {
-        const shortMsg = (m.msg || "").slice(0, 60)
-        report += `• \`${m.id}\` — ${shortMsg}\n`
+        report += `• \`${m.id}\` — ${m.msg}\n`
       })
       report += `\n`
     }
 
     if (notFound.length > 0) {
       report += `🚫 *Model tidak dikenali (${notFound.length}):*\n`
-      notFound.forEach(m => { report += `• \`${m.id}\`` + `\n` })
+      notFound.forEach(m => { report += `• \`${m.id}\`\n` })
     }
 
-    report += `\n━━━━━━━━━━━━━━━━━━━━\n💡 Test model lain: *.testmodel <id>*`
+    report += `\n━━━━━━━━━━━━━━━━━━━━\n`
+    report += `💡 Test model lain: *.testmodel <id>*\n`
+    report += `📊 Cek saldo: *.ruxastatus*`
 
     return sock.sendMessage(from, { text: report })
   }

@@ -4,7 +4,7 @@
  */
 
 const { generateImage }                           = require("../ai/storynote")
-const { useTokens, getTokens, getTokenWarning }   = require("../ai/tokendb")
+const { useTokens, getTokens, getTokenWarning, addTokens }   = require("../ai/tokendb")
 
 const API_KEY    = process.env.STORYNOTE_API_KEY || process.env.RUXA_API_KEY
 const FAST_MODEL = process.env.STORYNOTE_FAST_MODEL || process.env.RUXA_FAST_MODEL || "dall-e-3"
@@ -12,7 +12,7 @@ const TOKEN_COST = 1
 
 async function getImage(prompt) {
   if (!API_KEY) {
-    return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?nologo=true`
+    throw new Error("RUXA_API_KEY belum diset di environment")
   }
   return generateImage({ prompt, modelId: FAST_MODEL, aspectRatio: "1:1" })
 }
@@ -65,6 +65,7 @@ module.exports = {
       if (warning) await sock.sendMessage(from, { text: warning })
 
     } catch (err) {
+      addTokens(sender, TOKEN_COST)
       console.log("IMG ERROR:", err?.message)
       await sock.sendMessage(from, { text: `❌ Gagal generate gambar\n\nError: ${err?.message}` })
     }
