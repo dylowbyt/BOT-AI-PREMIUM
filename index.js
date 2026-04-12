@@ -22,6 +22,7 @@ const {
 
 const { startGempaMonitor } = require("./ai/gempaAlert")
 const { startPaymentChecker } = require("./ai/paymentchecker")
+const { registerUser } = require("./ai/userdb")
 
 const OpenAI = require("openai")
 const openai = new OpenAI({
@@ -115,20 +116,20 @@ async function startBot() {
     const { connection, qr, lastDisconnect } = update
 
     if (qr) {
-      console.log("ð± QR TERDETEKSI")
+      console.log("📱 QR TERDETEKSI")
       const qrImage = await QRCode.toDataURL(qr)
       console.log(qrImage)
     }
 
     if (connection === "open") {
-      console.log("â BOT CONNECTED")
+      console.log("✅ BOT CONNECTED")
       startGempaMonitor(sock)
       startPaymentChecker(sock)
     }
 
     if (connection === "close") {
       const reason = lastDisconnect?.error?.output?.statusCode
-      console.log("â Disconnect:", reason)
+      console.log("❌ Disconnect:", reason)
 
       if (reason !== DisconnectReason.loggedOut) {
         setTimeout(startBot, 5000)
@@ -163,7 +164,13 @@ async function startBot() {
       const isGroup = from.endsWith("@g.us")
       const sender = m.key.participant || m.key.remoteJid
 
-      // ===== IMAGE DETECT (DIPINDAH KE ATAS â) =====
+      // ===== REGISTER USER OTOMATIS =====
+      try {
+        const pushName = m.pushName || ""
+        registerUser(sender, pushName)
+      } catch {}
+
+      // ===== IMAGE DETECT (DIPINDAH KE ATAS ✅) =====
       const directImage = m.message?.imageMessage
       const quotedImage = quoted?.imageMessage
       const isImage = !!(directImage || quotedImage)
@@ -190,7 +197,7 @@ async function startBot() {
         }
       }
 
-      // ===== AUTOPILOT CHECK (SEKARANG AMAN â) =====
+      // ===== AUTOPILOT CHECK (SEKARANG AMAN ✅) =====
       if (isGroup) {
         try {
           const autopilot = require("./plugins/autopilot")
@@ -205,43 +212,43 @@ async function startBot() {
 
       if (isGroup && !text.startsWith(".")) return
 
-      // ===== ANON SWAP â harus SEBELUM brain & plugin =====
+      // ===== ANON SWAP — harus SEBELUM brain & plugin =====
       // Jika user dalam sesi anon: semua pesan diteruskan ke partner
       // Semua AI/plugin/fitur bot diblokir selama mode ini aktif
       try {
         const anondb = require("./ai/anondb")
         if (anondb.isInSession(sender)) {
 
-          // .stop â keluar dari sesi
+          // .stop → keluar dari sesi
           if (text.toLowerCase() === ".stop") {
             const partnerId = anondb.endSession(sender)
             await sock.sendMessage(from, {
               text:
-                `ðª *Kamu keluar dari anonymous chat.*\n\n` +
-                `â Semua fitur AI & bot kembali aktif!\n` +
+                `🚪 *Kamu keluar dari anonymous chat.*\n\n` +
+                `✅ Semua fitur AI & bot kembali aktif!\n` +
                 `Ketik *.anon* untuk cari stranger lagi.`
             })
             if (partnerId) {
               await sock.sendMessage(partnerId, {
                 text:
-                  `â ï¸ *Stranger telah keluar dari chat.*\n\n` +
+                  `⚠️ *Stranger telah keluar dari chat.*\n\n` +
                   `Ketik *.anon* untuk cari stranger baru.`
               })
             }
             return
           }
 
-          // Semua pesan lain â forward ke partner
+          // Semua pesan lain → forward ke partner
           const partnerId = anondb.getPartner(sender)
           if (partnerId) {
             await anondb.forwardMessage(sock, m, sender, partnerId)
           }
-          return // â BLOKIR semua AI/plugin/bot
+          return // ← BLOKIR semua AI/plugin/bot
         }
       } catch (anonErr) {
         console.log("Anon swap error:", anonErr.message)
       }
-      // âââââââââââââââââââââââââââââââââââââââââââââââââ
+      // ═════════════════════════════════════════════════
 
       // ===== BRAIN =====
       let res = null
@@ -301,7 +308,7 @@ async function startBot() {
             await plugin.run(sock, m, args)
           } catch (e) {
             console.log("Plugin run error:", file, e.message)
-            await sock.sendMessage(from, { text: "â Error menjalankan fitur: " + e.message })
+            await sock.sendMessage(from, { text: "❌ Error menjalankan fitur: " + e.message })
           }
           return
         }
@@ -309,7 +316,7 @@ async function startBot() {
 
       if (isFromAI) {
         return sock.sendMessage(from, {
-          text: "â Fitur tidak ditemukan"
+          text: "❌ Fitur tidak ditemukan"
         })
       }
 
@@ -384,7 +391,7 @@ async function startBot() {
         } catch (err) {
           console.log("AI ERROR:", err.message)
           await sock.sendMessage(from, {
-            text: "â ï¸ AI error, coba lagi nanti"
+            text: "⚠️ AI error, coba lagi nanti"
           })
         }
       }
