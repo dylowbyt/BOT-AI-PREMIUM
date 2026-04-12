@@ -97,12 +97,37 @@ function translateError(msg, httpStatus) {
   if (httpStatus === 429) return "Terlalu banyak request ke Ruxa AI, tunggu sebentar"
   if (httpStatus === 500) return "Server Ruxa AI sedang bermasalah, coba lagi nanti"
   if (!msg) return "Terjadi kesalahan pada Ruxa AI"
+
   if (msg.includes("积分不足")) {
-    const match = msg.match(/([\d.]+).*?([\d.]+)\s*积分/)
-    if (match) return `Kredit Ruxa AI tidak cukup.\n💰 Butuh: ${match[1]}\n💳 Saldo: ${match[2]}\nTop up: https://ruxa.ai/dashboard`
-    return "Kredit Ruxa AI tidak cukup. Top up di https://ruxa.ai/dashboard"
+    // Coba parse format: "需要X积分，余额Y积分" atau sejenisnya
+    // Cari semua angka dalam pesan
+    const numbers = msg.match(/[\d.]+/g) || []
+    const butuh  = numbers[0] ? parseFloat(numbers[0]) : null
+    const saldo  = numbers[1] ? parseFloat(numbers[1]) : null
+
+    if (butuh !== null && saldo !== null) {
+      // Jika butuh lebih besar dari harga model termurah (3),
+      // kemungkinan Ruxa punya minimum saldo yang harus dipertahankan
+      const isMinBalance = butuh >= 10 && saldo < butuh
+      const note = isMinBalance
+        ? `\n\n⚠️ Ruxa AI membutuhkan saldo minimal *${butuh} kredit* di akun kamu.\n` +
+          `Saldo kamu sekarang *${saldo} kredit* — silakan top up minimal *${butuh - saldo} kredit* lagi.`
+        : ""
+      return (
+        `Kredit Ruxa AI tidak cukup.\n` +
+        `💰 Dibutuhkan: *${butuh} kredit*\n` +
+        `💳 Saldo kamu: *${saldo} kredit*` +
+        note +
+        `\n\n🔗 Top up: https://ruxa.ai/dashboard`
+      )
+    }
+    return "Kredit Ruxa AI tidak cukup.\nSilakan top up di https://ruxa.ai/dashboard"
   }
-  if (msg.includes("未找到支持模型") || msg.includes("渠道")) return "Model tidak tersedia di akun Ruxa AI"
+
+  if (msg.includes("未找到支持模型") || msg.includes("渠道")) {
+    return "Model tidak tersedia di akun Ruxa AI. Pastikan model ini sudah aktif di dashboard kamu."
+  }
+
   return msg
 }
 
