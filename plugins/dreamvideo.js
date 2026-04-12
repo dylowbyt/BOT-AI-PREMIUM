@@ -1,16 +1,21 @@
 /**
  * dreamvideo.js — AI Generate Video Sinematik dari Deskripsi Mimpi
  * Command: .dreamvideo
- * 23 TOKEN - menggunakan Ruxa AI (veo3.1)
+ * Biaya token dinamis sesuai model Ruxa AI:
+ *   veo-3   → 16 token
+ *   veo-3.1 → 18 token
+ *   sora-2  → 10 token
  */
 
 require("dotenv").config()
 const OpenAI = require("openai")
 const { generateVideo } = require("../ai/ruxavideo")
 const { useTokens, getTokens, addTokens, getTokenWarning } = require("../ai/tokendb")
+const { getModelTokenCost } = require("../ai/ruxaimage")
 
-const openai    = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-const TOKEN_COST = 23
+const openai     = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+const VIDEO_MODEL = "veo-3"
+const TOKEN_COST  = getModelTokenCost(VIDEO_MODEL)
 
 module.exports = {
   name: "dreamvideo",

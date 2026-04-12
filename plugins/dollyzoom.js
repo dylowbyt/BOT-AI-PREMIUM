@@ -3,10 +3,14 @@ const FormData = require("form-data")
 const { downloadMediaMessage } = require("@whiskeysockets/baileys")
 const { getTokens, addTokens, useTokens } = require("../ai/tokendb")
 
+const { getModelTokenCost } = require("../ai/ruxaimage")
+
 const RUXA_API_KEY = process.env.RUXA_API_KEY || process.env.STORYNOTE_API_KEY
 const BASE_URL = process.env.RUXA_BASE_URL || "https://api.ruxa.ai/api/v1"
 const DEFAULT_MODEL = process.env.RUXA_DOLLYZOOM_MODEL || "veo3.1"
-const TOKEN_COST = 23
+
+// Biaya token ditampilkan di menu → pakai biaya model default
+const MENU_TOKEN_COST = getModelTokenCost(DEFAULT_MODEL)
 
 const MODEL_MAP = {
   veo3: "veo3",
@@ -233,6 +237,7 @@ module.exports = {
     const from = m.key.remoteJid
     const sender = m.key.participant || m.key.remoteJid
     let tokenDeducted = false
+    let TOKEN_COST = MENU_TOKEN_COST
 
     try {
       const text = getText(m)
@@ -243,6 +248,9 @@ module.exports = {
       const directImage = getImageMessage(m.message)
       const quotedImage = getImageMessage(quoted)
       const imageMessage = directImage ? m.message : quotedImage ? quoted : null
+
+      // Hitung TOKEN_COST dinamis berdasarkan model yang dipilih
+      TOKEN_COST = getModelTokenCost(model)
 
       if (!userPrompt && !imageMessage) {
         return sock.sendMessage(from, {
@@ -255,12 +263,12 @@ module.exports = {
             `Reply foto dengan:\n` +
             `*.dollyzoom <arah scene>*\n\n` +
             `Pilih model opsional:\n` +
-            `*.dollyzoom --model veo31 <prompt>*\n` +
-            `*.dollyzoom --model veo3 <prompt>*\n` +
-            `*.dollyzoom --model sora <prompt>*\n\n` +
+            `*.dollyzoom --model veo31 <prompt>* → *18 token*\n` +
+            `*.dollyzoom --model veo3 <prompt>* → *16 token*\n` +
+            `*.dollyzoom --model sora <prompt>* → *10 token*\n\n` +
             `Contoh:\n` +
             `*.dollyzoom --model veo31 drone view dari atas kota malam, kamera turun smooth ke mobil sport, dolly zoom effect dramatis, jernih 4k*\n\n` +
-            `🪙 Biaya: *${TOKEN_COST} token*`
+            `🪙 Biaya default (veo3.1): *${MENU_TOKEN_COST} token*`
         })
       }
 
@@ -275,10 +283,12 @@ module.exports = {
         return sock.sendMessage(from, {
           text:
             `❌ *Token kamu tidak cukup!*\n\n` +
+            `🤖 Model: *${model}*\n` +
             `🪙 Token kamu: *${tokens}*\n` +
             `💸 Dibutuhkan: *${TOKEN_COST} token*\n\n` +
             `Fitur ini termasuk *Premium*.\n` +
-            `Ketik *.premium* atau *.buy basic* untuk isi token.`
+            `Ketik *.premium* atau *.buy basic* untuk isi token.\n` +
+            `💡 Coba model lebih murah: --model sora (10 token)`
         })
       }
 

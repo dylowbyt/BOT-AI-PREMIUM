@@ -3,10 +3,14 @@ const FormData = require("form-data")
 const { downloadMediaMessage } = require("@whiskeysockets/baileys")
 const { getTokens, addTokens, useTokens } = require("../ai/tokendb")
 
+const { getModelTokenCost } = require("../ai/ruxaimage")
+
 const RUXA_API_KEY = process.env.RUXA_API_KEY || process.env.STORYNOTE_API_KEY
 const BASE_URL = process.env.RUXA_BASE_URL || "https://api.ruxa.ai/api/v1"
 const DEFAULT_MODEL = process.env.RUXA_CINEMATIC_MODEL || "veo3.1"
-const TOKEN_COST = 23
+
+// Biaya token ditampilkan di menu → pakai biaya model default
+const MENU_TOKEN_COST = getModelTokenCost(DEFAULT_MODEL)
 
 const MODEL_MAP = {
   veo3: "veo3",
@@ -15,6 +19,13 @@ const MODEL_MAP = {
   sora: "sora-2",
   sora2: "sora-2",
   "sora-2": "sora-2"
+}
+
+// Map biaya per model untuk info menu
+const VIDEO_TOKEN_INFO = {
+  "veo3":   "16 token",
+  "veo3.1": "18 token",
+  "sora-2": "10 token"
 }
 
 function getText(m) {
@@ -228,6 +239,7 @@ module.exports = {
     const from = m.key.remoteJid
     const sender = m.key.participant || m.key.remoteJid
     let tokenDeducted = false
+    let TOKEN_COST = MENU_TOKEN_COST
 
     try {
       const text = getText(m)
@@ -238,6 +250,9 @@ module.exports = {
       const directImage = getImageMessage(m.message)
       const quotedImage = getImageMessage(quoted)
       const imageMessage = directImage ? m.message : quotedImage ? quoted : null
+
+      // Hitung TOKEN_COST dinamis berdasarkan model yang dipilih
+      TOKEN_COST = getModelTokenCost(model)
 
       if (!userPrompt && !imageMessage) {
         return sock.sendMessage(from, {
@@ -250,11 +265,12 @@ module.exports = {
             `Reply foto dengan:\n` +
             `*.cinematik <arah gerakan / suasana>*\n\n` +
             `Pilih model opsional:\n` +
-            `*.cinematik --model veo31 <prompt>*\n` +
-            `*.cinematik --model veo3 <prompt>*\n` +
-            `*.cinematik --model sora <prompt>*\n\n` +
+            `*.cinematik --model veo31 <prompt>* → *18 token*\n` +
+            `*.cinematik --model veo3 <prompt>* → *16 token*\n` +
+            `*.cinematik --model sora <prompt>* → *10 token*\n\n` +
             `Contoh:\n` +
-            `*.cinematik --model veo31 mobil sport melaju malam hari, smooth tracking shot, cinematic, jernih 4k*`
+            `*.cinematik --model veo31 mobil sport melaju malam hari, smooth tracking shot, cinematic, jernih 4k*\n\n` +
+            `🪙 Biaya default (veo3.1): *${MENU_TOKEN_COST} token*`
         })
       }
 
@@ -269,10 +285,12 @@ module.exports = {
         return sock.sendMessage(from, {
           text:
             `❌ *Token kamu tidak cukup!*\n\n` +
+            `🤖 Model: *${model}*\n` +
             `🪙 Token kamu: *${tokens}*\n` +
             `💸 Dibutuhkan: *${TOKEN_COST} token*\n\n` +
             `Fitur ini termasuk *Premium*.\n` +
-            `Ketik *.premium* atau *.buy basic* untuk isi token.`
+            `Ketik *.premium* atau *.buy basic* untuk isi token.\n` +
+            `💡 Coba model lebih murah: --model sora (10 token)`
         })
       }
 
