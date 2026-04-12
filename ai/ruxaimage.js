@@ -335,5 +335,6 @@ module.exports = {
   TOKEN_COST_MAP,
   MODEL_MAP,
   checkRuxaBalance,
-  isInsufficientCredits
+  isInsufficientCredits,
+  parseCreditNumbers
 }
