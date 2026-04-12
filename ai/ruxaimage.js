@@ -125,7 +125,11 @@ function translateError(msg, httpStatus) {
   }
 
   if (msg.includes("未找到支持模型") || msg.includes("渠道")) {
-    return "Model tidak tersedia di akun Ruxa AI. Pastikan model ini sudah aktif di dashboard kamu."
+    return (
+      `Model tidak tersedia / tidak aktif di akun Ruxa AI.\n` +
+      `📝 Pesan asli Ruxa: _${msg}_\n\n` +
+      `💡 Gunakan *.cekruxa* untuk lihat daftar model yang benar di akun kamu.`
+    )
   }
 
   return msg
@@ -154,7 +158,9 @@ async function createAndPoll(ruxaModel, input, apiKey) {
   }
 
   if (res.data?.code !== 200) {
-    throw new Error(translateError(res.data?.message))
+    const rawMsg = res.data?.message || JSON.stringify(res.data)
+    console.log(`[ruxaimage] Task creation gagal. Model: ${ruxaModel}, Code: ${res.data?.code}, Msg: ${rawMsg}`)
+    throw new Error(translateError(rawMsg))
   }
 
   const taskId = res.data?.data?.taskId
@@ -180,7 +186,10 @@ async function createAndPoll(ruxaModel, input, apiKey) {
       continue // skip, coba lagi di iterasi berikutnya
     }
 
-    const { state, resultJson } = queryRes.data?.data || {}
+    const taskData = queryRes.data?.data || {}
+    const { state, resultJson } = taskData
+    // Coba ambil alasan gagal dari berbagai field yang mungkin ada
+    const failReason = taskData.failReason || taskData.errorMsg || taskData.error || taskData.message
 
     if (state === "success") {
       let parsed = {}
@@ -191,7 +200,9 @@ async function createAndPoll(ruxaModel, input, apiKey) {
     }
 
     if (state === "fail") {
-      throw new Error("Ruxa AI gagal membuat gambar. Coba prompt yang berbeda")
+      const reason = failReason ? translateError(failReason) : "Coba prompt yang berbeda atau ganti model"
+      console.log(`[ruxaimage] Task gagal. Model: ${ruxaModel}, Alasan: ${failReason || "(tidak ada)")`)
+      throw new Error(`Ruxa AI gagal membuat gambar. ${reason}`)
     }
   }
 
