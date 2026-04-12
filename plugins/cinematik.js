@@ -1,7 +1,7 @@
 const axios = require("axios")
 const FormData = require("form-data")
 const { downloadMediaMessage } = require("@whiskeysockets/baileys")
-const { getTokens, addTokens } = require("../ai/tokendb")
+const { getTokens, addTokens, useTokens } = require("../ai/tokendb")
 
 const RUXA_API_KEY = process.env.RUXA_API_KEY || process.env.STORYNOTE_API_KEY
 const BASE_URL = process.env.RUXA_BASE_URL || "https://api.ruxa.ai/api/v1"
@@ -287,7 +287,7 @@ module.exports = {
           `⏳ Proses bisa 1-5 menit, tunggu ya.`
       })
 
-      addTokens(sender, -TOKEN_COST)
+      useTokens(sender, TOKEN_COST)
       tokenDeducted = true
 
       let imageUrl = null

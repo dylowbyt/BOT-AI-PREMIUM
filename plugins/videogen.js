@@ -10,7 +10,7 @@
  *   RUXA_API_KEY  — API Key dari ruxa.ai
  */
 
-const { getTokens, addTokens } = require("../ai/tokendb")
+const { getTokens, addTokens, useTokens } = require("../ai/tokendb")
 const { generateVideo }        = require("../ai/ruxavideo")
 
 const VIDEO_MODELS = {
@@ -57,7 +57,7 @@ async function handleVideoGen(sock, m, args, command) {
       `⏳ Mohon tunggu, proses ini bisa memakan waktu 1-5 menit...`
   })
 
-  addTokens(sender, -model.cost)
+  useTokens(sender, model.cost)
 
   try {
     const videoUrl = await generateVideo({

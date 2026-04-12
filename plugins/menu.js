@@ -43,13 +43,11 @@ const CATEGORIES = [
 🐛 *.debugcode <kode/screenshot>*  —  Debug kode error  🆓
    Alias: .debug .fixcode .errorfix
 
-🏷️ *.namebrand <deskripsi bisnis>*  —  Nama brand + logo  🪙10
-   Alias: .brandname .brandai
-
-⚖️ *.ainotaris <jenis> <detail>*  —  Dokumen hukum resmi  🪙10
-   Alias: .notaris .surathukum
-   Jenis: perjanjian kontrak sewa hutang kuasa
-         pernyataan kerjasama hibah jual nda`
+━━━━━━━━━━━━━━━━━━━━
+💎 *Fitur AI premium (pakai token):*
+_.namebrand .ainotaris .brainrot .moodmusic_
+_.promtnikah .promtlinbin .promtmulin_
+Ketik *.premium* untuk info lengkap & harga token`
   },
   {
     no: 2,
@@ -79,15 +77,11 @@ const CATEGORIES = [
 
 📺 *.statushd*  —  Optimasi video untuk Status WA
 
-🎭 *.swapavatar*  —  Swap wajah ke video  🪙23
-   Alias: .faceswap .gantiavatar
-
-🌙 *.dreamvideo <deskripsi mimpi>*  —  Video dari mimpi  🪙23
-   Alias: .mimpi2video .dreamgen
-
-🧠 *.brainrot <topik>*  —  Konten brainrot absurd  🪙7/23
-   Alias: .brainfood .absurd .gila
-   (teks=7 token | kirim foto/video=23 token)`
+━━━━━━━━━━━━━━━━━━━━
+💎 *Fitur video premium (pakai token):*
+_.veo3 .veo31 .sora2 .runway .runwayturbo_
+_.dreamvideo .swapavatar .imgtovid .dollyzoom .cinematik .brainrot_
+Ketik *.premium* untuk info lengkap & harga token`
   },
   {
     no: 3,
@@ -102,10 +96,6 @@ const CATEGORIES = [
 
 🖼️ *.imgai*  —  AI image processing
 
-🔥 *.imgpro*  —  Pro image enhancement
-
-⭐ *.imghd*  —  Upscale gambar ke HD
-
 😂 *.memeai <teks>*  —  Buat meme otomatis
 
 🤪 *.botak*  —  Efek kepala botak ke foto
@@ -114,15 +104,13 @@ const CATEGORIES = [
    Efek: triggered wasted jail wanted
 
 👗 *.fasion [foto]*  —  Analisis outfit & saran style  🆓
-   Alias: .fashion .outfitcheck .stylecheck
+   Alias: .fashion .outfitcheck
 
-💇 *.messybun [foto] [gaya]*  —  Ganti gaya rambut  🪙4
-   Alias: .trendhair .gantiram .hairai .hairstyle
-   Gaya: messybun wolfcut bobcut curly
-         buzzcut panjang kepang undercut
-
-📸 *.hdpro [foto]*  —  Enhance foto Sony A1 quality  🪙3
-   Alias: .hdphoto .enhancephoto .sonya1 .fotohd`
+━━━━━━━━━━━━━━━━━━━━
+💎 *Fitur foto premium (pakai token):*
+_.img .imghd .imgpro .nano .nano2 .nanopro .nanoedit_
+_.gptimg .gpt4o .hdpro .messybun_
+Ketik *.premium* untuk info lengkap & harga token`
   },
   {
     no: 4,
@@ -338,8 +326,10 @@ const CATEGORIES = [
 📰 *.gossipai <nama>*  —  Gosip fiktif & dramatis  🆓
    Alias: .gosip .gossip .infoterkini
 
-🧠 *.brainrot <topik>*  —  Konten brainrot absurd  🪙7/23
-   Alias: .brainfood .absurd .gila`
+━━━━━━━━━━━━━━━━━━━━
+💎 *Fitur premium (pakai token):*
+_.brainrot_ — 7/23 token (Konten brainrot absurd)
+Ketik *.premium* untuk info lengkap`
   },
   {
     no: 11,
@@ -356,9 +346,6 @@ const CATEGORIES = [
 🧠 *.cekmental <cerita>*  —  Analisis kondisi mental  🆓
    Alias: .mentalcheck .curhat .psikologi
 
-🎵 *.moodmusic <mood/foto>*  —  Rekomendasi musik + lirik  🪙7
-   Alias: .musikmood .songmood .playlistai
-
 ⏰ *.reminder <waktu> <pesan>*  —  Set pengingat otomatis
 
 📝 *.catat <teks>*  —  Simpan catatan/to-do
@@ -369,7 +356,12 @@ const CATEGORIES = [
 
 📒 *.logbook <catatan>*  —  Catat kegiatan harian
 
-⭐ *.level*  —  Lihat XP & level kamu`
+⭐ *.level*  —  Lihat XP & level kamu
+
+━━━━━━━━━━━━━━━━━━━━
+💎 *Fitur premium (pakai token):*
+_.moodmusic_ — 7 token (Rekomendasi musik dari mood)
+Ketik *.premium* untuk info lengkap`
   },
   {
     no: 12,

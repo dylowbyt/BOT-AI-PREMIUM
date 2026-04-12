@@ -155,35 +155,49 @@ module.exports = {
       const tokens = getTokens(sender)
       return sock.sendMessage(from, {
         text:
-          `💎 *PREMIUM AI GENERATOR*\n\n` +
-          `🪙 Token kamu: *${tokens} token*\n\n` +
+          `💎 *PREMIUM AI GENERATOR*\n` +
           `━━━━━━━━━━━━━━━━━━━━\n` +
-          `📦 *PILIH PAKET:*\n\n` +
-          `1️⃣  *Basic*  — 20 token → ${formatRupiah(10000)}\n` +
-          `2️⃣  *Medium* — 50 token → ${formatRupiah(25000)}\n` +
-          `3️⃣  *Pro*    — 100 token → ${formatRupiah(50000)}\n\n` +
+          `🪙 Token kamu: *${tokens} token*\n\n` +
+          `📦 *PAKET TOKEN:*\n` +
+          `1️⃣  *.buy basic*  — 20 token → Rp10.000\n` +
+          `2️⃣  *.buy medium* — 50 token → Rp25.000\n` +
+          `3️⃣  *.buy pro*    — 100 token → Rp50.000\n\n` +
           `━━━━━━━━━━━━━━━━━━━━\n` +
           `🖼️ *GENERATE GAMBAR:*\n` +
-          `⚡ .img         — 1 token\n` +
-          `⚖️ .img-hd      — 2 token\n` +
-          `👑 .img-pro     — 3 token\n` +
-          `🍌 .nano        — 3 token   (Nano Banana Basic)\n` +
-          `🍌 .nanoedit    — 3 token   (Nano Banana Edit)\n` +
-          `🍌 .nano2       — 4 token   (Nano Banana 2)\n` +
-          `🍌 .nanopro     — 8 token   (Nano Banana Pro)\n` +
-          `🤖 .gptimg      — 8 token   (GPT Image 1.5)\n` +
-          `🧠 .gpt4o       — 10 token  (GPT-4o Image)\n\n` +
+          `⚡ *.img*          — 1 token\n` +
+          `⭐ *.imghd*        — 2 token\n` +
+          `👑 *.imgpro*       — 3 token\n` +
+          `🍌 *.nano*         — 3 token  (Nano Banana)\n` +
+          `✏️ *.nanoedit*     — 3 token  (Nano Banana Edit)\n` +
+          `🍌 *.nano2*        — 4 token  (Nano Banana 2)\n` +
+          `🍌 *.nanopro*      — 8 token  (Nano Banana Pro)\n` +
+          `🤖 *.gptimg*       — 8 token  (GPT Image 1)\n` +
+          `🧠 *.gpt4o*        — 10 token (GPT-4o Image)\n` +
+          `📸 *.hdpro*        — 3 token  (Enhance foto HD)\n` +
+          `💇 *.messybun*     — 4 token  (Ganti gaya rambut)\n\n` +
           `━━━━━━━━━━━━━━━━━━━━\n` +
           `🎬 *GENERATE VIDEO:*\n` +
-          `🌀 .sora2         — 10 token  (OpenAI Sora 2)\n` +
-          `⚡ .runway-turbo  — 8 token   (Runway Gen3 Turbo)\n` +
-          `🎞️ .runway        — 12 token  (Runway Gen3)\n` +
-          `🎬 .veo3          — 16 token  (Google Veo 3)\n` +
-          `🎥 .veo31         — 18 token  (Google Veo 3.1)\n\n` +
-          `🔄 *SWAP AVATAR:*\n` +
-          `🧑 .swapavatar    — 23 token  (Ruxa AI Face Swap)\n\n` +
+          `🌀 *.sora2*        — 10 token (OpenAI Sora 2)\n` +
+          `⚡ *.runwayturbo*  — 8 token  (Runway Gen3 Turbo)\n` +
+          `🎞️ *.runway*       — 12 token (Runway Gen3)\n` +
+          `🎬 *.veo3*         — 16 token (Google Veo 3)\n` +
+          `🎥 *.veo31*        — 18 token (Google Veo 3.1)\n` +
+          `🌙 *.dreamvideo*   — 23 token (Video dari mimpi)\n` +
+          `🎭 *.swapavatar*   — 23 token (Face Swap)\n` +
+          `🎥 *.imgtovid*     — 23 token (Gambar ke Video)\n` +
+          `🎬 *.dollyzoom*    — 23 token (Dolly Zoom)\n` +
+          `🎬 *.cinematik*    — 23 token (Sinematik)\n\n` +
           `━━━━━━━━━━━━━━━━━━━━\n` +
-          `📝 Ketik: *.buy basic* / *.buy medium* / *.buy pro* / *.tutorial*`
+          `✨ *FITUR LAIN:*\n` +
+          `🧠 *.brainrot*     — 7/23 token (Konten viral)\n` +
+          `🎵 *.moodmusic*    — 7 token  (Musik dari mood)\n` +
+          `🏷️ *.namebrand*    — 10 token (Nama brand AI)\n` +
+          `⚖️ *.ainotaris*    — 10 token (Dokumen hukum)\n` +
+          `💍 *.promtnikah*   — 15 token (Foto pernikahan AI)\n` +
+          `👶 *.promtlinbin*  — 15 token (Foto bayi AI)\n` +
+          `👶 *.promtmulin*   — 15 token (Foto mulan AI)\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `📝 Beli: *.buy basic* / *.buy medium* / *.buy pro*`
       })
     }
 

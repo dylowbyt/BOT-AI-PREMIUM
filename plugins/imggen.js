@@ -19,7 +19,7 @@
  *   RUXA_API_KEY — API Key dari ruxa.ai
  */
 
-const { getTokens, addTokens } = require("../ai/tokendb")
+const { getTokens, addTokens, useTokens } = require("../ai/tokendb")
 const { generateImage, editImage } = require("../ai/ruxaimage")
 const axios = require("axios")
 
@@ -146,7 +146,7 @@ async function handleImgGen(sock, m, args, command) {
           `⏳ Mohon tunggu sebentar...`
       })
 
-      addTokens(sender, -model.cost)
+      useTokens(sender, model.cost)
 
       try {
         const result = await editImage({ prompt, imageBuffers, model: model.model })
@@ -227,7 +227,7 @@ async function handleImgGen(sock, m, args, command) {
       `⏳ Mohon tunggu sebentar...`
   })
 
-  addTokens(sender, -model.cost)
+  useTokens(sender, model.cost)
 
   try {
     const result = await generateImage({ prompt, model: model.model })

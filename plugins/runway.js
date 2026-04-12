@@ -2,7 +2,7 @@
  * runway.js — Plugin generate video Runway AI (Premium) [FIX + CUSTOM RATIO]
  */
 
-const { getTokens, addTokens } = require("../ai/tokendb")
+const { getTokens, addTokens, useTokens } = require("../ai/tokendb")
 const { generateVideo }        = require("../ai/aivideoapi")
 
 const RUNWAY_MODELS = {
@@ -84,7 +84,7 @@ async function handleRunway(sock, m, args, command) {
   })
 
   // POTONG TOKEN
-  addTokens(sender, -model.cost)
+  useTokens(sender, model.cost)
 
   try {
     const videoUrl = await generateVideo({

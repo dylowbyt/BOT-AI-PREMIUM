@@ -15,7 +15,7 @@
 
 const { downloadMediaMessage } = require("@whiskeysockets/baileys")
 const { editImage }             = require("../ai/ruxaimage")
-const { getTokens, addTokens, getTokenWarning } = require("../ai/tokendb")
+const { getTokens, addTokens, useTokens, getTokenWarning } = require("../ai/tokendb")
 const axios = require("axios")
 const FormData = require("form-data")
 
@@ -172,7 +172,7 @@ module.exports = {
     })
 
     if (hasRuxa) {
-      addTokens(sender, -TOKEN_COST)
+      useTokens(sender, TOKEN_COST)
     }
 
     try {

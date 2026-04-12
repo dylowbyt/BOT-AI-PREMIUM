@@ -1,6 +1,6 @@
 const axios = require("axios")
 const { downloadMediaMessage } = require("@whiskeysockets/baileys")
-const { getTokens, addTokens } = require("../ai/tokendb")
+const { getTokens, addTokens, useTokens } = require("../ai/tokendb")
 
 const API_KEY =
   process.env.GEMINI_API_KEY ||
@@ -204,7 +204,7 @@ module.exports = {
           `⏳ Tunggu sebentar, proses bisa 30-120 detik.`
       })
 
-      addTokens(sender, -TOKEN_COST)
+      useTokens(sender, TOKEN_COST)
       tokenDeducted = true
 
       const personImage = await downloadImage(sock, m, quoted, "person")
