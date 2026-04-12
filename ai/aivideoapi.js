@@ -7,11 +7,21 @@
 const axios = require("axios")
 
 const AIVIDEO_API_KEY = process.env.AIVIDEO_API_KEY
-const BASE_URL = "https://api.aivideoapi.com"
+const BASE_URL        = "https://api.aivideoapi.com"
 
+// Model names sesuai aivideoapi.com docs
 const MODEL_CONFIG = {
-  "runway-gen3":       { model: "gen3",       label: "Runway Gen3"       },
-  "runway-gen3-turbo": { model: "gen3_turbo", label: "Runway Gen3 Turbo" }
+  "runway-gen3":       { model: "gen3",              label: "Runway Gen3"       },
+  "runway-gen3-turbo": { model: "gen3_alpha_turbo",  label: "Runway Gen3 Turbo" }
+}
+
+// Konversi ratio user (16:9) → format API (1280:768)
+const RATIO_MAP = {
+  "16:9": "1280:768",
+  "9:16": "768:1280",
+  "1:1":  "1024:1024",
+  "4:3":  "1024:768",
+  "3:4":  "768:1024"
 }
 
 function getHeaders() {
@@ -21,65 +31,114 @@ function getHeaders() {
   }
 }
 
-async function generateVideo({ prompt, modelKey = "runway-gen3", duration = 5, ratio = "1280:768", maxWaitMs = 300000 }) {
-  if (!AIVIDEO_API_KEY) throw new Error("AIVIDEO_API_KEY belum diset di Railway")
+/**
+ * Generate video Runway via aivideoapi.com
+ * @param {string} prompt       - Deskripsi video
+ * @param {string} modelKey     - "runway-gen3" | "runway-gen3-turbo"
+ * @param {number} duration     - 5 atau 10 detik
+ * @param {string} ratio        - "16:9" | "9:16" | "1:1" | "4:3" | "3:4"
+ * @param {number} maxWaitMs    - Maks tunggu polling (default 5 menit)
+ */
+async function generateVideo({ prompt, modelKey = "runway-gen3", duration = 5, ratio = "16:9", maxWaitMs = 300000 }) {
+  if (!AIVIDEO_API_KEY) throw new Error("AIVIDEO_API_KEY belum diset di environment")
 
   const config = MODEL_CONFIG[modelKey]
   if (!config) throw new Error(`Model tidak dikenal: ${modelKey}`)
 
-  const res = await axios.post(
-    `${BASE_URL}/runway/generate/text`,
-    {
-      text_prompt: prompt,
-      model:       config.model,
-      duration,
-      ratio,
-      watermark:   false,
-      interpolate: false,
-      upscale:     false
-    },
-    { headers: getHeaders() }
-  )
+  // Konversi ratio ke format API
+  const apiRatio = RATIO_MAP[ratio] || RATIO_MAP["16:9"]
+
+  console.log(`[AIVideoAPI] Generating: model=${config.model} ratio=${apiRatio} duration=${duration}`)
+
+  let res
+  try {
+    res = await axios.post(
+      `${BASE_URL}/runway/generate/text`,
+      {
+        text_prompt: prompt,
+        model:       config.model,
+        duration:    duration,
+        ratio:       apiRatio,
+        watermark:   false,
+        interpolate: false,
+        upscale:     false
+      },
+      {
+        headers: getHeaders(),
+        timeout: 30000
+      }
+    )
+  } catch (err) {
+    const status = err.response?.status
+    const body   = err.response?.data
+
+    if (status === 404) throw new Error("Endpoint aivideoapi.com tidak ditemukan (404). Pastikan AIVIDEO_API_KEY valid dan aktif.")
+    if (status === 401) throw new Error("API Key aivideoapi.com tidak valid atau expired. Cek AIVIDEO_API_KEY.")
+    if (status === 402) throw new Error("Kredit aivideoapi.com habis. Top up di https://aivideoapi.com/dashboard")
+    if (status === 429) throw new Error("Terlalu banyak request ke aivideoapi.com. Tunggu sebentar.")
+
+    const msg = body?.error || body?.message || err.message
+    throw new Error(`aivideoapi.com error (${status || "network"}): ${msg}`)
+  }
 
   const data = res.data
   console.log("[AIVideoAPI] Generate response:", JSON.stringify(data))
 
+  // Kalau langsung dapat URL
   if (data.url || data.video_url) {
     return data.url || data.video_url
   }
 
+  // Ambil task ID untuk polling
   const taskId = data.uuid || data.id || data.task_id
   if (!taskId) {
     console.log("[AIVideoAPI] Full response:", JSON.stringify(data))
-    throw new Error("Tidak mendapat task ID dari aivideoapi.com")
+    throw new Error("Tidak mendapat task ID dari aivideoapi.com. Response: " + JSON.stringify(data))
   }
 
+  console.log(`[AIVideoAPI] Task ID: ${taskId} — mulai polling...`)
+
+  // Polling status
   const interval = 5000
   const maxTries = Math.ceil(maxWaitMs / interval)
 
   for (let i = 0; i < maxTries; i++) {
     await new Promise(r => setTimeout(r, interval))
 
-    const poll = await axios.get(
-      `${BASE_URL}/runway/status/${taskId}`,
-      { headers: getHeaders() }
-    )
+    let poll
+    try {
+      poll = await axios.get(
+        `${BASE_URL}/runway/status/${taskId}`,
+        {
+          headers: getHeaders(),
+          timeout: 10000
+        }
+      )
+    } catch (pollErr) {
+      const s = pollErr.response?.status
+      if (s === 404) throw new Error(`Task ${taskId} tidak ditemukan. Coba generate ulang.`)
+      if (s === 401) throw new Error("API Key tidak valid saat polling.")
+      console.log(`[AIVideoAPI] Polling error (attempt ${i + 1}):`, pollErr.message)
+      continue
+    }
 
     const job    = poll.data
     const status = (job.status || "").toLowerCase()
 
-    if (status === "succeeded" || status === "completed" || status === "success") {
-      const url = job.url || job.video_url || job.output?.url
+    console.log(`[AIVideoAPI] Poll ${i + 1}/${maxTries} — status: ${status}`)
+
+    if (["succeeded", "completed", "success"].includes(status)) {
+      const url = job.url || job.video_url || job.output?.url || job.resultUrl
       if (url) return url
-      throw new Error("Video selesai tapi URL tidak ditemukan")
+      throw new Error("Video selesai tapi URL tidak ditemukan di response")
     }
 
-    if (status === "failed" || status === "error") {
-      throw new Error("Generate video gagal: " + (job.error || job.message || "unknown"))
+    if (["failed", "error", "cancelled"].includes(status)) {
+      throw new Error("Generate video gagal: " + (job.error || job.message || status))
     }
   }
 
-  throw new Error("Timeout: video tidak selesai dalam waktu yang ditentukan")
+  throw new Error(`Timeout ${Math.floor(maxWaitMs / 60000)} menit: video tidak selesai. Coba lagi nanti.`)
 }
 
-module.exports = { generateVideo, MODEL_CONFIG }
+module.exports = { generateVideo, MODEL_CONFIG, RATIO_MAP }
