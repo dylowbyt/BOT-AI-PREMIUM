@@ -1,7 +1,7 @@
 /**
  * hdpro.js — AI Photo Enhancement Sony A1 Style
  * Command: .hdpro
- * 3 TOKEN - menggunakan Ruxa AI (Nano Banana Basic Edit)
+ * 3 TOKEN - menggunakan AI Image Edit (Nano Banana Edit)
  */
 
 require("dotenv").config()
@@ -27,7 +27,6 @@ module.exports = {
     const quotedImg = quoted?.imageMessage
     const hasImg    = !!(directImg || quotedImg)
 
-    // ─── MENU ─────────────────────────────────────────
     if (!hasImg) {
       return sock.sendMessage(from, {
         text:
@@ -53,7 +52,6 @@ module.exports = {
       })
     }
 
-    // ─── CEK TOKEN ────────────────────────────────────
     const tokens = getTokens(sender)
     if (tokens < TOKEN_COST) {
       return sock.sendMessage(from, {
@@ -75,7 +73,6 @@ module.exports = {
     })
 
     try {
-      // ─── Download gambar ──────────────────────────
       let imageBuffer
       if (directImg) {
         imageBuffer = await downloadMediaMessage(
@@ -89,7 +86,10 @@ module.exports = {
         )
       }
 
-      // ─── Edit via Ruxa AI Nano Banana ─────────────
+      if (!imageBuffer || imageBuffer.length < 1000) {
+        throw new Error("Gagal download gambar atau gambar terlalu kecil")
+      }
+
       const remaining = useTokens(sender, TOKEN_COST)
 
       const resultUrl = await editImage({
@@ -98,13 +98,12 @@ module.exports = {
         model:        "nano-banana-edit"
       })
 
-      // ─── Kirim hasil ──────────────────────────────
       await sock.sendMessage(from, {
         image:   { url: resultUrl },
         caption:
           `📸 *HD Pro Enhancement Selesai!*\n\n` +
           `🎬 *Sony A1 + 85mm f/1.4 Style*\n` +
-          `🤖 Model: *Nano Banana Edit (Ruxa AI)*\n` +
+          `🤖 Model: *Nano Banana Edit*\n` +
           `🪙 Token terpakai: *${TOKEN_COST}* | Sisa: *${remaining}*\n\n` +
           `_Hasil terbaik dengan foto portrait wajah jelas_`
       })
