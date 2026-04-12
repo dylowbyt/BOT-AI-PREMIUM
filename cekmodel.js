@@ -22,4 +22,3 @@ async function cekModels() {
 }
 
 cekModels()
-"start": "node cekmodel.js"
