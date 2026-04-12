@@ -21,7 +21,45 @@ const MODEL_MAP = {
   "gpt-image-1.5":    "gpt-image-1-5",
   "gpt-image-1-5":    "gpt-image-1-5",
   "gpt-4o":           "gpt-4o-image",
-  "gpt-4o-image":     "gpt-4o-image"
+  "gpt-4o-image":     "gpt-4o-image",
+  "sora":             "sora-2",
+  "sora-2":           "sora-2",
+  "veo-3":            "veo-3",
+  "veo-3.1":          "veo-3-1",
+  "veo-3-1":          "veo-3-1"
+}
+
+// Biaya token per model — sesuai harga kredit Ruxa AI
+// image
+const TOKEN_COST_MAP = {
+  "nano-banana":      3,
+  "nano-banana-2":    4,
+  "nano-banana-pro":  8,
+  "nano-banana-edit": 3,
+  "gpt-image-1":      7,
+  "gpt-image-1-5":    7,
+  "gpt-image-1.5":    7,
+  "gpt-4o-image":     10,
+  "gpt-4o":           10,
+  // video
+  "sora-2":           10,
+  "sora":             10,
+  "veo-3":            16,
+  "veo-3-1":          18,
+  "veo-3.1":          18
+}
+
+/**
+ * Ambil biaya token untuk model tertentu.
+ * Cek nama lokal dulu, lalu nama resmi Ruxa, default 10.
+ */
+function getModelTokenCost(model) {
+  if (!model) return 10
+  const key = model.toLowerCase()
+  if (TOKEN_COST_MAP[key] !== undefined) return TOKEN_COST_MAP[key]
+  const mapped = MODEL_MAP[key]
+  if (mapped && TOKEN_COST_MAP[mapped] !== undefined) return TOKEN_COST_MAP[mapped]
+  return 10
 }
 
 // Ambil API key — coba utama dulu, fallback ke backup
@@ -179,4 +217,4 @@ async function editImage({ prompt, imageBuffers, model }) {
   return createAndPollWithFallback(ruxaModel, input)
 }
 
-module.exports = { generateImage, editImage }
+module.exports = { generateImage, editImage, getModelTokenCost, TOKEN_COST_MAP, MODEL_MAP }
