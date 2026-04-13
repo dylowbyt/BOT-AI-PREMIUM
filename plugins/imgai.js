@@ -17,11 +17,11 @@ const { generateImage, getModelTokenCost } = require("../ai/ruxaimage")
 const { useTokens, getTokens, addTokens, getTokenWarning } = require("../ai/tokendb")
 
 const IMAGE_MODELS = [
-  { key: "nano-banana",      label: "Nano Banana",      cost: 3  },
-  { key: "nano-banana-2",    label: "Nano Banana 2",    cost: 4  },
-  { key: "nano-banana-pro",  label: "Nano Banana Pro",  cost: 8  },
+  { key: "nano-banana",      label: "Nano Banana",      cost: 3   },
+  { key: "nano-banana-2",    label: "Nano Banana 2",    cost: 4   },
+  { key: "nano-banana-pro",  label: "Nano Banana Pro",  cost: 8   },
   { key: "gpt-image-1",      label: "GPT Image 1",      cost: 7  },
-  { key: "gpt-image-1.5",    label: "GPT Image 1.5",    cost: 7  },
+  { key: "gpt-image-1.5",    label: "GPT Image 1.5",    cost: 7.1 },
   { key: "gpt-4o-image",     label: "GPT-4o Image",     cost: 10 }
 ]
 

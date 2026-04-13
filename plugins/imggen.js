@@ -18,11 +18,11 @@ const { generateImage, editImage } = require("../ai/ruxaimage")
 const axios = require("axios")
 
 const IMAGE_MODELS = {
-  nano:     { model: "nano-banana",      label: "Nano Banana Basic", cost: 3,  isEdit: false, canEdit: false, emoji: "🍌" },
-  nano2:    { model: "nano-banana-2",    label: "Nano Banana 2",     cost: 4,  isEdit: false, canEdit: false, emoji: "🍌" },
-  nanopro:  { model: "nano-banana-pro",  label: "Nano Banana Pro",   cost: 8,  isEdit: false, canEdit: true,  emoji: "🍌" },
-  nanoedit: { model: "nano-banana-edit", label: "Nano Banana Edit",  cost: 3,  isEdit: true,  canEdit: true,  emoji: "✏️" },
-  gptimg:   { model: "gpt-image-1.5",   label: "GPT Image 1.5",     cost: 8,  isEdit: false, canEdit: false, emoji: "🤖" },
+  nano:     { model: "nano-banana",      label: "Nano Banana Basic", cost: 3,   isEdit: false, canEdit: false, emoji: "🍌" },
+  nano2:    { model: "nano-banana-2",    label: "Nano Banana 2",     cost: 4,   isEdit: false, canEdit: false, emoji: "🍌" },
+  nanopro:  { model: "nano-banana-pro",  label: "Nano Banana Pro",   cost: 8,   isEdit: false, canEdit: true,  emoji: "🍌" },
+  nanoedit: { model: "nano-banana-edit", label: "Nano Banana Edit",  cost: 3,   isEdit: true,  canEdit: true,  emoji: "✏️" },
+  gptimg:   { model: "gpt-image-1.5",   label: "GPT Image 1.5",     cost: 7.1, isEdit: false, canEdit: false, emoji: "🤖" },
   gpt4o:    { model: "gpt-4o",           label: "GPT-4o Image",      cost: 10, isEdit: false, canEdit: false, emoji: "🧠" }
 }
 
