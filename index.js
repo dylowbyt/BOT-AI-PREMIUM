@@ -134,28 +134,7 @@ if (connection === "open") {
 
 if (connection === "close") {
   const reason = lastDisconnect?.error?.output?.statusCode
-  const errorMsg = lastDisconnect?.error?.message || ""
-  console.log("❌ Disconnect:", reason, errorMsg)
-
-  // Auto hapus session kalau corrupt/closed
-  if (
-    errorMsg.includes("closed session") ||
-    errorMsg.includes("Decrypted message") ||
-    reason === 401 ||
-    reason === 440
-  ) {
-    console.log("🗑️ Session bermasalah, hapus session & restart...")
-    try {
-      if (fs.existsSync(SESSION_DIR)) {
-        fs.rmSync(SESSION_DIR, { recursive: true, force: true })
-        console.log("✅ Session dihapus, scan QR ulang...")
-      }
-    } catch (e) {
-      console.log("⚠️ Gagal hapus session:", e.message)
-    }
-    setTimeout(startBot, 3000)
-    return
-  }
+  console.log("❌ Disconnect:", reason)
 
   if (reason !== DisconnectReason.loggedOut) {
     setTimeout(startBot, 5000)
@@ -242,10 +221,13 @@ if (m.message?.protocolMessage) return
   if (isGroup && !text.startsWith(".")) return
 
   // ===== ANON SWAP — harus SEBELUM brain & plugin =====
+  // Jika user dalam sesi anon: semua pesan diteruskan ke partner
+  // Semua AI/plugin/fitur bot diblokir selama mode ini aktif
   try {
     const anondb = require("./ai/anondb")
     if (anondb.isInSession(sender)) {
 
+      // .stop → keluar dari sesi
       if (text.toLowerCase() === ".stop") {
         const partnerId = anondb.endSession(sender)
         await sock.sendMessage(from, {
@@ -264,15 +246,17 @@ if (m.message?.protocolMessage) return
         return
       }
 
+      // Semua pesan lain → forward ke partner
       const partnerId = anondb.getPartner(sender)
       if (partnerId) {
         await anondb.forwardMessage(sock, m, sender, partnerId)
       }
-      return
+      return // ← BLOKIR semua AI/plugin/bot
     }
   } catch (anonErr) {
     console.log("Anon swap error:", anonErr.message)
   }
+  // ═════════════════════════════════════════════════
 
   // ===== BRAIN =====
   let res = null
