@@ -11,23 +11,57 @@ const FormData = require("form-data")
 
 const BASE_URL = "https://api.ruxa.ai/api/v1"
 
-// Model mapping: nama lokal → nama model resmi di Ruxa AI
-const MODEL_MAP = {
-  "nano-banana":      "nano-banana",
-  "nano-banana-2":    "nano-banana-2",
-  "nano-banana-pro":  "nano-banana-pro",
-  "nano-banana-edit": "nano-banana-edit",
-  "gpt-image-1":      "gpt-image-1",
-  "gpt-image-1.5":    "gpt-image-1-5",
-  "gpt-image-1-5":    "gpt-image-1-5",
-  "gpt-4o":           "gpt-4o-image",
-  "gpt-4o-image":     "gpt-4o-image",
-  "sora":             "sora-2",
-  "sora-2":           "sora-2",
-  "veo-3":            "veo-3",
-  "veo-3.1":          "veo-3-1",
-  "veo-3-1":          "veo-3-1"
+const MODEL_ALIASES = {
+  "nano-banana": [
+    process.env.RUXA_NANO_BANANA_MODEL,
+    process.env.RUXA_FAST_MODEL,
+    "nano-banana",
+    "nanobanana",
+    "nano_banana",
+    "gemini-2.5-flash-image-preview"
+  ],
+  "nano-banana-2": [
+    process.env.RUXA_NANO_BANANA_2_MODEL,
+    "nano-banana-2",
+    "nano-banana2",
+    "nanobanana2",
+    "nano_banana_2",
+    "gemini-2.5-flash-image-preview"
+  ],
+  "nano-banana-pro": [
+    process.env.RUXA_NANO_BANANA_PRO_MODEL,
+    process.env.RUXA_PRO_MODEL,
+    "nano-banana-pro",
+    "nanobanana-pro",
+    "nanobananapro",
+    "nano_banana_pro",
+    "gemini-3-pro-image-preview",
+    "gemini-2.5-flash-image-preview"
+  ],
+  "nano-banana-edit": [
+    process.env.RUXA_NANO_BANANA_EDIT_MODEL,
+    "nano-banana-edit",
+    "nano-banana-pro",
+    "nanobanana-edit",
+    "nanobananaedit",
+    "nano_banana_edit",
+    "gemini-2.5-flash-image-preview"
+  ],
+  "gpt-image-1": ["gpt-image-1"],
+  "gpt-image-1.5": ["gpt-image-1-5", "gpt-image-1.5"],
+  "gpt-image-1-5": ["gpt-image-1-5", "gpt-image-1.5"],
+  "gpt-4o": ["gpt-4o-image", "gpt-4o"],
+  "gpt-4o-image": ["gpt-4o-image", "gpt-4o"],
+  "sora": ["sora-2"],
+  "sora-2": ["sora-2"],
+  "veo-3": ["veo-3"],
+  "veo-3.1": ["veo-3-1"],
+  "veo-3-1": ["veo-3-1"]
 }
+
+const MODEL_MAP = Object.fromEntries(
+  Object.entries(MODEL_ALIASES).map(([key, aliases]) => [key, aliases.filter(Boolean)[0] || key])
+)
 
 // Biaya token per model — sesuai harga kredit Ruxa AI
 const TOKEN_COST_MAP = {
@@ -50,11 +84,33 @@ const TOKEN_COST_MAP = {
 
 function getModelTokenCost(model) {
   if (!model) return 10
-  const key = model.toLowerCase()
+  const key = normalizeModelKey(model)
   if (TOKEN_COST_MAP[key] !== undefined) return TOKEN_COST_MAP[key]
   const mapped = MODEL_MAP[key]
   if (mapped && TOKEN_COST_MAP[mapped] !== undefined) return TOKEN_COST_MAP[mapped]
   return 10
+}
+
+function normalizeModelKey(model) {
+  return String(model || "").trim().toLowerCase().replace(/_/g, "-")
+}
+
+function uniqueList(items) {
+  const seen = new Set()
+  const result = []
+  for (const item of items) {
+    const value = String(item || "").trim()
+    if (!value || seen.has(value)) continue
+    seen.add(value)
+    result.push(value)
+  }
+  return result
+}
+
+function resolveModelCandidates(model) {
+  const key = normalizeModelKey(model || "nano-banana")
+  const aliases = MODEL_ALIASES[key] || MODEL_ALIASES[key.replace(/-/g, "_")] || [model]
+  return uniqueList(aliases)
 }
 
 function getApiKey(useBackup = false) {
@@ -88,7 +144,34 @@ async function uploadToCatbox(buffer) {
 function isInsufficientCredits(msg) {
   if (!msg) return false
   const m = msg.toLowerCase()
-  return m.includes("积分不足") || m.includes("insufficient") || m.includes("credit")
+  return (
+    m.includes("积分不足") ||
+    m.includes("余额不足") ||
+    m.includes("insufficient credit") ||
+    m.includes("insufficient credits") ||
+    m.includes("not enough credit") ||
+    m.includes("not enough credits") ||
+    m.includes("credit balance is insufficient") ||
+    m.includes("balance not enough")
+  )
+}
+
+function isModelUnavailable(msg, httpStatus) {
+  if (httpStatus === 404) return true
+  if (!msg) return false
+  const m = msg.toLowerCase()
+  return (
+    msg.includes("未找到支持模型") ||
+    msg.includes("渠道") ||
+    msg.includes("模型不存在") ||
+    m.includes("model not found") ||
+    m.includes("model does not exist") ||
+    m.includes("model not exist") ||
+    m.includes("unsupported model") ||
+    m.includes("not support model") ||
+    m.includes("model is not supported") ||
+    m.includes("invalid model")
+  )
 }
 
 // Parse angka kredit dari pesan error Ruxa AI
@@ -153,11 +236,11 @@ function translateError(msg, httpStatus) {
     return result
   }
 
-  if (msg.includes("未找到支持模型") || msg.includes("渠道")) {
+  if (isModelUnavailable(msg, httpStatus)) {
     return (
       `Model tidak tersedia / tidak aktif di akun Ruxa AI.\n` +
       `📝 Pesan asli Ruxa: _${msg}_\n\n` +
-      `💡 Gunakan *.cekruxa* untuk lihat daftar model yang benar di akun kamu.`
+      `💡 Gunakan *.cekruxa* atau set ENV RUXA_NANO_BANANA_MODEL / RUXA_NANO_BANANA_PRO_MODEL sesuai model di akun kamu.`
     )
   }
 
@@ -218,10 +301,21 @@ async function createAndPoll(ruxaModel, input, apiKey) {
   if (res.status === 401) throw new Error(translateError(null, 401))
   if (res.status === 429) throw new Error(translateError(null, 429))
   if (res.status === 500) throw new Error(translateError(null, 500))
+  if (res.status === 404) {
+    const err = new Error(translateError(res.data?.message || JSON.stringify(res.data), 404))
+    err.isModelUnavailable = true
+    throw err
+  }
 
   if (res.data?.code !== 200) {
     const rawMsg = res.data?.message || JSON.stringify(res.data)
     console.log(`[ruxaimage] Task creation gagal. Model: ${ruxaModel}, Code: ${res.data?.code}, Msg: ${rawMsg}`)
+
+    if (isModelUnavailable(rawMsg, res.status)) {
+      const err = new Error(translateError(rawMsg, res.status))
+      err.isModelUnavailable = true
+      throw err
+    }
 
     if (isInsufficientCredits(rawMsg)) {
       const err = new Error(translateError(rawMsg))
@@ -295,6 +389,7 @@ async function createAndPollWithFallback(ruxaModel, input) {
       backupKey &&
       (err.message.includes("tidak valid") ||
        err.message.includes("kedaluwarsa") ||
+       err.isModelUnavailable ||
        err.isInsufficientCredits)
 
     if (shouldTryBackup) {
@@ -307,25 +402,56 @@ async function createAndPollWithFallback(ruxaModel, input) {
 }
 
 // Generate gambar dari teks
+async function tryModels(model, input) {
+  const candidates = resolveModelCandidates(model)
+  const retryableErrors = []
+
+  for (const candidate of candidates) {
+    try {
+      console.log(`[ruxaimage] Mencoba model: ${candidate}`)
+      return await createAndPollWithFallback(candidate, input)
+    } catch (err) {
+      if (err.isModelUnavailable || err.isInsufficientCredits) {
+        retryableErrors.push({ model: candidate, error: err })
+        console.log(`[ruxaimage] Model ${candidate} gagal, coba kandidat lain: ${err.message}`)
+        continue
+      }
+      throw err
+    }
+  }
+
+  const firstInsufficient = retryableErrors.find(item => item.error.isInsufficientCredits)
+  if (firstInsufficient) throw firstInsufficient.error
+
+  const tried = candidates.map(m => `\`${m}\``).join(", ")
+  const err = new Error(
+    `Semua kandidat model gagal / tidak dikenal: ${tried}.\n` +
+    `Kalau nama model Ruxa kamu berbeda, set ENV RUXA_NANO_BANANA_MODEL, RUXA_NANO_BANANA_2_MODEL, RUXA_NANO_BANANA_EDIT_MODEL, atau RUXA_NANO_BANANA_PRO_MODEL.`
+  )
+  err.isModelUnavailable = true
+  throw err
+}
+
 async function generateImage({ prompt, model }) {
-  const ruxaModel = MODEL_MAP[model] || model
-  return createAndPollWithFallback(ruxaModel, { prompt })
+  return tryModels(model || "nano-banana", { prompt })
 }
 
 // Edit gambar dengan prompt
 async function editImage({ prompt, imageBuffers, model }) {
-  const ruxaModel = MODEL_MAP[model] || model
-
   if (!imageBuffers || imageBuffers.length === 0) {
     throw new Error("Tidak ada gambar yang dikirim")
   }
 
   const urls = await Promise.all(imageBuffers.map(uploadToCatbox))
 
-  const input = { prompt, image_url: urls[0] }
+  const input = {
+    prompt,
+    image_url: urls[0],
+    image_urls: urls
+  }
   if (urls[1]) input.image_url_2 = urls[1]
 
-  return createAndPollWithFallback(ruxaModel, input)
+  return tryModels(model || "nano-banana-edit", input)
 }
 
 module.exports = {
@@ -334,7 +460,10 @@ module.exports = {
   getModelTokenCost,
   TOKEN_COST_MAP,
   MODEL_MAP,
+  MODEL_ALIASES,
+  resolveModelCandidates,
   checkRuxaBalance,
   isInsufficientCredits,
+  isModelUnavailable,
   parseCreditNumbers
 }
