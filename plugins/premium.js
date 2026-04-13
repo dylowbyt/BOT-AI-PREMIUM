@@ -99,7 +99,7 @@ async function fetchMidtransStatus(reference) {
 
 module.exports = {
   name:  "premium",
-  alias: ["buy", "token", "topup", "addtoken", "cekbayar", "tutorial", "cektoken", "saldo"],
+  alias: ["buy", "token", "topup", "addtoken", "cekbayar", "tutorial"],
 
   async run(sock, m, args) {
     const from    = m.key.remoteJid
@@ -150,32 +150,8 @@ module.exports = {
       })
     }
 
-    // ─── .token / .cektoken / .saldo → tampilkan saldo saja ──────
-    if (["token", "cektoken", "saldo"].includes(command)) {
-      const tokens = getTokens(sender)
-      const status =
-        tokens <= 0   ? "❌ Habis — segera top up!" :
-        tokens <= 5   ? `⚠️ Hampir habis (${tokens} token)` :
-        tokens <= 20  ? `🟡 Cukup (${tokens} token)` :
-                        `✅ Aman (${tokens} token)`
-      return sock.sendMessage(from, {
-        text:
-          `🪙 *CEK TOKEN*\n` +
-          `━━━━━━━━━━━━━━━━━━━━\n` +
-          `👤 Nomor: ${sender.replace("@s.whatsapp.net", "").replace(/:\d+$/, "")}\n` +
-          `🪙 Saldo token: *${tokens} token*\n` +
-          `📊 Status: ${status}\n\n` +
-          `━━━━━━━━━━━━━━━━━━━━\n` +
-          `📦 Top up token:\n` +
-          `1️⃣  *.buy basic*  — 20 token (Rp10.000)\n` +
-          `2️⃣  *.buy medium* — 50 token (Rp25.000)\n` +
-          `3️⃣  *.buy pro*    — 100 token (Rp50.000)\n\n` +
-          `📋 Lihat semua fitur & harga: *.premium*`
-      })
-    }
-
-    // ─── .premium / .topup ─────────────────────────────────────
-    if (["premium", "topup"].includes(command)) {
+    // ─── .premium ──────────────────────────────────────────────
+    if (command === "premium") {
       const tokens = getTokens(sender)
       return sock.sendMessage(from, {
         text:
@@ -195,7 +171,7 @@ module.exports = {
           `✏️ *.nanoedit*     — 3 token  (Nano Banana Edit)\n` +
           `🍌 *.nano2*        — 4 token  (Nano Banana 2)\n` +
           `🍌 *.nanopro*      — 8 token  (Nano Banana Pro)\n` +
-          `🤖 *.gptimg*       — 8 token  (GPT Image 1.5)\n` +
+          `🤖 *.gptimg*       — 8 token  (GPT Image 1)\n` +
           `🧠 *.gpt4o*        — 10 token (GPT-4o Image)\n` +
           `📸 *.hdpro*        — 3 token  (Enhance foto HD)\n` +
           `💇 *.messybun*     — 4 token  (Ganti gaya rambut)\n\n` +
@@ -206,11 +182,11 @@ module.exports = {
           `🎞️ *.runway*       — 12 token (Runway Gen3)\n` +
           `🎬 *.veo3*         — 16 token (Google Veo 3)\n` +
           `🎥 *.veo31*        — 18 token (Google Veo 3.1)\n` +
-          `🌙 *.dreamvideo*   — 16 token (Veo 3 default)\n` +
+          `🌙 *.dreamvideo*   — 23 token (Video dari mimpi)\n` +
           `🎭 *.swapavatar*   — 23 token (Face Swap)\n` +
           `🎥 *.imgtovid*     — 23 token (Gambar ke Video)\n` +
-          `🎬 *.dollyzoom*    — 16 token (Dolly Zoom, Veo 3)\n` +
-          `🎬 *.cinematik*    — 16 token (Sinematik, Veo 3)\n\n` +
+          `🎬 *.dollyzoom*    — 23 token (Dolly Zoom)\n` +
+          `🎬 *.cinematik*    — 23 token (Sinematik)\n\n` +
           `━━━━━━━━━━━━━━━━━━━━\n` +
           `✨ *FITUR LAIN:*\n` +
           `🧠 *.brainrot*     — 7/23 token (Konten viral)\n` +
@@ -385,13 +361,16 @@ module.exports = {
           `🪙 Total: ${newTotal} token`
       })
 
-      await sock.sendMessage(userId, {
-        text:
-          `🎉 *Token kamu telah diisi!*\n\n` +
-          `➕ Ditambahkan: *${amount} token*\n` +
-          `🪙 Total token: *${newTotal}*\n\n` +
-          `Ketik *.img <prompt>* untuk mulai! 🖼️`
-      }).catch(() => {})
+      // Coba kirim notifikasi ke user, abaikan kalau gagal
+      try {
+        await sock.sendMessage(userId, {
+          text:
+            `🎉 *Token kamu telah diisi!*\n\n` +
+            `➕ Ditambahkan: *${amount} token*\n` +
+            `🪙 Total token: *${newTotal}*\n\n` +
+            `Ketik *.premium* untuk lihat fitur! 🎨`
+        })
+      } catch {}
     }
   }
 }
