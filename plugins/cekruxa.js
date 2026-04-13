@@ -8,19 +8,25 @@
  */
 
 const axios = require("axios")
-const { checkRuxaBalance, parseCreditNumbers } = require("../ai/ruxaimage")
+const {
+  checkRuxaBalance,
+  parseCreditNumbers,
+  resolveModelCandidates,
+  isInsufficientCredits,
+  isModelUnavailable
+} = require("../ai/ruxaimage")
 
 const CANDIDATES = [
-  "nano-banana",
-  "nano-banana-2",
-  "nano-banana-pro",
-  "nano-banana-edit",
+  ...resolveModelCandidates("nano-banana"),
+  ...resolveModelCandidates("nano-banana-2"),
+  ...resolveModelCandidates("nano-banana-pro"),
+  ...resolveModelCandidates("nano-banana-edit"),
   "gpt-image-1",
   "gpt-image-1-5",
   "gpt-image-1.5",
   "gpt-4o-image",
   "gpt-4o",
-]
+].filter((value, index, arr) => value && arr.indexOf(value) === index)
 
 async function testModel(apiKey, modelId) {
   const res = await axios.post(
@@ -125,7 +131,7 @@ module.exports = {
         }
 
         const msgLower = message.toLowerCase()
-        if (msgLower.includes("积分不足") || msgLower.includes("insufficient") || msgLower.includes("credit")) {
+        if (isInsufficientCredits(message)) {
           const { butuh, saldo } = parseCreditNumbers(message)
           return sock.sendMessage(from, {
             text:
@@ -193,20 +199,10 @@ module.exports = {
 
       if (taskId) {
         working.push({ id: modelId })
-      } else if (
-        msgLower.includes("积分不足") ||
-        msgLower.includes("insufficient") ||
-        msgLower.includes("credit")
-      ) {
+      } else if (isInsufficientCredits(message)) {
         const { butuh: bCredit, saldo: sSaldo } = parseCreditNumbers(message)
         creditFail.push({ id: modelId, butuh: bCredit !== null ? bCredit : "?", saldo: sSaldo !== null ? sSaldo : "?", raw: message })
-      } else if (
-        msgLower.includes("未找到") ||
-        msgLower.includes("渠道") ||
-        msgLower.includes("not found") ||
-        msgLower.includes("not support") ||
-        code === 404
-      ) {
+      } else if (isModelUnavailable(message, code)) {
         notFound.push({ id: modelId })
       } else {
         otherFail.push({ id: modelId, code, msg: message.slice(0, 60) })
