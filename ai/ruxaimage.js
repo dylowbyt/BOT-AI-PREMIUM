@@ -243,7 +243,7 @@ function parseCreditNumbers(msg) {
 }
 
 // Terjemahkan error dari Ruxa AI
-function translateError(msg, httpStatus) {
+function translateError(msg, httpStatus, ruxaModel = null) {
   if (httpStatus === 401) return "API Key Ruxa AI tidak valid atau kedaluwarsa"
   if (httpStatus === 429) return "Terlalu banyak request ke Ruxa AI, tunggu sebentar"
   if (httpStatus === 500) return "Server Ruxa AI sedang bermasalah, coba lagi nanti"
@@ -251,11 +251,17 @@ function translateError(msg, httpStatus) {
 
   if (msg.includes("积分不足")) {
     const { butuh, saldo } = parseCreditNumbers(msg)
+    const expectedCost = ruxaModel ? getModelTokenCost(ruxaModel) : null
 
     let result = `Kredit Ruxa AI tidak cukup.\n`
-    if (butuh !== null) result += `💰 Dibutuhkan: *${butuh} kredit*\n`
-    if (saldo !== null) result += `💳 Saldo kamu: *${saldo} kredit*\n`
+    if (ruxaModel) result += `🤖 Model API: *${ruxaModel}*\n`
+    if (expectedCost !== null) result += `🪙 Harga model di bot: *${expectedCost} token*\n`
+    if (butuh !== null) result += `💰 Balasan Ruxa API: butuh *${butuh} kredit*\n`
+    if (saldo !== null) result += `💳 Saldo Ruxa API key ini: *${saldo} kredit*\n`
     result += `\n🔗 Top up: https://ruxa.ai/dashboard`
+    result +=
+      `\n\n📌 Angka kredit di atas berasal langsung dari server Ruxa. ` +
+      `Kalau pricing dashboard menulis model ini lebih murah, biasanya penyebabnya API key yang dipakai bot berbeda, saldo key ini sudah 0, atau routing model di API Ruxa meminta minimum balance lebih besar.`
     result += `\n\n📝 _Pesan asli Ruxa: ${msg}_`
     return result
   }
@@ -326,7 +332,7 @@ async function createAndPoll(ruxaModel, input, apiKey) {
   if (res.status === 429) throw new Error(translateError(null, 429))
   if (res.status === 500) throw new Error(translateError(null, 500))
   if (res.status === 404) {
-    const err = new Error(translateError(res.data?.message || JSON.stringify(res.data), 404))
+    const err = new Error(translateError(res.data?.message || JSON.stringify(res.data), 404, ruxaModel))
     err.isModelUnavailable = true
     throw err
   }
@@ -336,13 +342,13 @@ async function createAndPoll(ruxaModel, input, apiKey) {
     console.log(`[ruxaimage] Task creation gagal. Model: ${ruxaModel}, Code: ${res.data?.code}, Msg: ${rawMsg}`)
 
     if (isModelUnavailable(rawMsg, res.status)) {
-      const err = new Error(translateError(rawMsg, res.status))
+      const err = new Error(translateError(rawMsg, res.status, ruxaModel))
       err.isModelUnavailable = true
       throw err
     }
 
     if (isInsufficientCredits(rawMsg)) {
-      const err = new Error(translateError(rawMsg))
+      const err = new Error(translateError(rawMsg, res.status, ruxaModel))
       err.isInsufficientCredits = true
       err.isTerminalRuxaError = true
       throw err
@@ -389,12 +395,12 @@ async function createAndPoll(ruxaModel, input, apiKey) {
 
     if (state === "fail") {
       if (failReason && isInsufficientCredits(failReason)) {
-        const err = new Error(translateError(failReason))
+        const err = new Error(translateError(failReason, null, ruxaModel))
         err.isInsufficientCredits = true
         err.isTerminalRuxaError = true
         throw err
       }
-      const reason = failReason ? translateError(failReason) : "Coba prompt yang berbeda atau ganti model"
+      const reason = failReason ? translateError(failReason, null, ruxaModel) : "Coba prompt yang berbeda atau ganti model"
       console.log(`[ruxaimage] Task gagal. Model: ${ruxaModel}, Alasan: ${failReason || "(tidak ada)"}`)
       const err = new Error(`Ruxa AI gagal membuat gambar. ${reason}`)
       err.isTerminalRuxaError = true
