@@ -17,16 +17,14 @@ const MODEL_ALIASES = {
     process.env.RUXA_FAST_MODEL,
     "nano-banana",
     "nanobanana",
-    "nano_banana",
-    "gemini-2.5-flash-image-preview"
+    "nano_banana"
   ],
   "nano-banana-2": [
     process.env.RUXA_NANO_BANANA_2_MODEL,
     "nano-banana-2",
     "nano-banana2",
     "nanobanana2",
-    "nano_banana_2",
-    "gemini-2.5-flash-image-preview"
+    "nano_banana_2"
   ],
   "nano-banana-pro": [
     process.env.RUXA_NANO_BANANA_PRO_MODEL,
@@ -34,9 +32,7 @@ const MODEL_ALIASES = {
     "nano-banana-pro",
     "nanobanana-pro",
     "nanobananapro",
-    "nano_banana_pro",
-    "gemini-3-pro-image-preview",
-    "gemini-2.5-flash-image-preview"
+    "nano_banana_pro"
   ],
   "nano-banana-edit": [
     process.env.RUXA_NANO_BANANA_EDIT_MODEL,
@@ -44,8 +40,7 @@ const MODEL_ALIASES = {
     "nano-banana-pro",
     "nanobanana-edit",
     "nanobananaedit",
-    "nano_banana_edit",
-    "gemini-2.5-flash-image-preview"
+    "nano_banana_edit"
   ],
   "gpt-image-1": ["gpt-image-1"],
   "gpt-image-1.5": ["gpt-image-1-5", "gpt-image-1.5"],
@@ -123,6 +118,35 @@ function getApiKey(useBackup = false) {
     throw new Error("RUXA_API_KEY_2 (backup) belum diset di environment")
   }
   return key
+}
+
+function getConfiguredApiKeys() {
+  return uniqueList([
+    process.env.RUXA_API_KEY,
+    process.env.RUXA_API_KEY_2,
+    ...(process.env.RUXA_API_KEYS || "").split(",")
+  ]).map((key, index) => ({ key, label: index === 0 ? "RUXA_API_KEY" : `RUXA_API_KEY_${index + 1}` }))
+}
+
+async function getApiKeyCandidates() {
+  const keys = getConfiguredApiKeys()
+  if (keys.length === 0) throw new Error("RUXA_API_KEY belum diset di environment")
+
+  const withBalance = await Promise.all(keys.map(async item => {
+    const balance = await checkRuxaBalance(item.key)
+    const numericBalance = balance === null || balance === undefined ? null : Number(balance)
+    return {
+      ...item,
+      balance,
+      numericBalance: Number.isFinite(numericBalance) ? numericBalance : null
+    }
+  }))
+
+  return withBalance.sort((a, b) => {
+    const av = a.numericBalance ?? -1
+    const bv = b.numericBalance ?? -1
+    return bv - av
+  })
 }
 
 // Upload buffer gambar ke catbox.moe → dapat URL publik
@@ -377,28 +401,38 @@ async function createAndPoll(ruxaModel, input, apiKey) {
   throw new Error("Timeout (2 menit) menunggu gambar dari Ruxa AI")
 }
 
-// Coba dengan key utama, fallback ke backup jika gagal
 async function createAndPollWithFallback(ruxaModel, input) {
-  const primaryKey = getApiKey(false)
+  const keys = await getApiKeyCandidates()
+  let lastError = null
 
-  try {
-    return await createAndPoll(ruxaModel, input, primaryKey)
-  } catch (err) {
-    const backupKey = process.env.RUXA_API_KEY_2
-    const shouldTryBackup =
-      backupKey &&
-      (err.message.includes("tidak valid") ||
-       err.message.includes("kedaluwarsa") ||
-       err.isModelUnavailable ||
-       err.isInsufficientCredits)
+  for (const item of keys) {
+    try {
+      const balanceInfo = item.balance !== null && item.balance !== undefined
+        ? `saldo ${item.balance}`
+        : "saldo tidak terbaca"
+      console.log(`[ruxaimage] Pakai ${item.label} (${balanceInfo})`)
+      return await createAndPoll(ruxaModel, input, item.key)
+    } catch (err) {
+      lastError = err
+      const canTryNext =
+        err.message.includes("tidak valid") ||
+        err.message.includes("kedaluwarsa") ||
+        err.isModelUnavailable ||
+        err.isInsufficientCredits
 
-    if (shouldTryBackup) {
-      console.log("[ruxaimage] Primary key gagal, coba backup key...")
-      return await createAndPoll(ruxaModel, input, backupKey)
+      if (!canTryNext) throw err
+      console.log(`[ruxaimage] ${item.label} gagal, coba key berikutnya jika ada: ${err.message}`)
     }
-
-    throw err
   }
+
+  if (lastError?.isInsufficientCredits) {
+    const balances = keys
+      .map(item => `${item.label}: ${item.balance !== null && item.balance !== undefined ? item.balance : "tidak terbaca"}`)
+      .join(", ")
+    lastError.message += `\n\n📌 Saldo API key yang terbaca bot: ${balances}.\nKalau dashboard Ruxa kamu ada 30 kredit, pastikan ENV RUXA_API_KEY berisi API key dari akun yang sama.`
+  }
+
+  throw lastError || new Error("Tidak ada API key Ruxa yang bisa digunakan")
 }
 
 // Generate gambar dari teks
