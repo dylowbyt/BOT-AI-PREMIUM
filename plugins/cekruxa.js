@@ -28,6 +28,19 @@ const CANDIDATES = [
   "gpt-4o",
 ].filter((value, index, arr) => value && arr.indexOf(value) === index)
 
+function getConfiguredApiKeys() {
+  const keys = [
+    process.env.RUXA_API_KEY,
+    process.env.RUXA_API_KEY_2,
+    ...(process.env.RUXA_API_KEYS || "").split(",")
+  ].map(v => String(v || "").trim()).filter(Boolean)
+
+  return [...new Set(keys)].map((key, index) => ({
+    key,
+    label: index === 0 ? "RUXA_API_KEY" : `RUXA_API_KEY_${index + 1}`
+  }))
+}
+
 async function testModel(apiKey, modelId) {
   const res = await axios.post(
     "https://api.ruxa.ai/api/v1/tasks/create",
@@ -60,7 +73,8 @@ module.exports = {
     ).trim()
     const command = rawText.slice(1).split(" ")[0].toLowerCase()
 
-    const apiKey = process.env.RUXA_API_KEY
+    const apiKeys = getConfiguredApiKeys()
+    const apiKey = apiKeys[0]?.key
     if (!apiKey) {
       return sock.sendMessage(from, {
         text: "❌ RUXA_API_KEY belum diset di environment."
@@ -73,26 +87,37 @@ module.exports = {
         text: `🔍 *Mengecek saldo akun Ruxa AI...*`
       })
 
-      const balance = await checkRuxaBalance(apiKey)
+      const balances = await Promise.all(apiKeys.map(async item => ({
+        ...item,
+        balance: await checkRuxaBalance(item.key)
+      })))
       let msg = `🤖 *STATUS AKUN RUXA AI*\n━━━━━━━━━━━━━━━━━━━━\n\n`
 
-      if (balance !== null) {
-        msg += `💰 *Saldo Kredit:* ${balance}\n\n`
-        if (balance < 3) {
+      for (const item of balances) {
+        msg += `🔑 *${item.label}:* ...${item.key.slice(-6)}\n`
+        msg += `💰 Saldo: *${item.balance !== null ? item.balance : "tidak terbaca"} kredit*\n\n`
+      }
+
+      const bestBalance = balances
+        .map(item => Number(item.balance))
+        .filter(n => Number.isFinite(n))
+        .sort((a, b) => b - a)[0]
+
+      if (bestBalance !== undefined) {
+        if (bestBalance < 3) {
           msg +=
             `⚠️ *KREDIT TIDAK CUKUP!*\n` +
-            `Model termurah (nano-banana) butuh *3 kredit*.\n` +
-            `Saldo kamu hanya *${balance} kredit*.\n\n`
+            `Model termurah (nano-banana) butuh minimal *3 kredit*.\n` +
+            `Saldo terbesar yang terbaca hanya *${bestBalance} kredit*.\n\n`
         } else {
-          msg += `✅ Saldo mencukupi untuk generate gambar.\n\n`
+          msg += `✅ Ada API key dengan saldo mencukupi untuk generate gambar.\n\n`
         }
       } else {
         msg += `💰 *Saldo:* Tidak bisa dicek via API (coba cek manual di dashboard)\n\n`
       }
 
       msg +=
-        `🔑 API Key: ...${apiKey.slice(-6)}\n` +
-        `🔑 Backup Key: ${process.env.RUXA_API_KEY_2 ? "✅ Ada" : "❌ Tidak ada"}\n\n` +
+        `🔑 Total API key terbaca: ${apiKeys.length}\n\n` +
         `🔗 Top up kredit: https://ruxa.ai/dashboard\n` +
         `📝 Test semua model: *.cekruxa*`
 
