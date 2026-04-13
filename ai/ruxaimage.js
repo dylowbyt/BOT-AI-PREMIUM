@@ -66,7 +66,7 @@ const TOKEN_COST_MAP = {
   "nano-banana-edit": 3,
   "gpt-image-1":      7,
   "gpt-image-1-5":    7,
-  "gpt-image-1.5":    7,
+  "gpt-image-1.5":    7.1,
   "gpt-4o-image":     10,
   "gpt-4o":           10,
   // video
@@ -344,6 +344,7 @@ async function createAndPoll(ruxaModel, input, apiKey) {
     if (isInsufficientCredits(rawMsg)) {
       const err = new Error(translateError(rawMsg))
       err.isInsufficientCredits = true
+      err.isTerminalRuxaError = true
       throw err
     }
 
@@ -390,11 +391,14 @@ async function createAndPoll(ruxaModel, input, apiKey) {
       if (failReason && isInsufficientCredits(failReason)) {
         const err = new Error(translateError(failReason))
         err.isInsufficientCredits = true
+        err.isTerminalRuxaError = true
         throw err
       }
       const reason = failReason ? translateError(failReason) : "Coba prompt yang berbeda atau ganti model"
       console.log(`[ruxaimage] Task gagal. Model: ${ruxaModel}, Alasan: ${failReason || "(tidak ada)"}`)
-      throw new Error(`Ruxa AI gagal membuat gambar. ${reason}`)
+      const err = new Error(`Ruxa AI gagal membuat gambar. ${reason}`)
+      err.isTerminalRuxaError = true
+      throw err
     }
   }
 
@@ -445,7 +449,11 @@ async function tryModels(model, input) {
       console.log(`[ruxaimage] Mencoba model: ${candidate}`)
       return await createAndPollWithFallback(candidate, input)
     } catch (err) {
-      if (err.isModelUnavailable || err.isInsufficientCredits) {
+      if (err.isInsufficientCredits || err.isTerminalRuxaError) {
+        throw err
+      }
+
+      if (err.isModelUnavailable) {
         retryableErrors.push({ model: candidate, error: err })
         console.log(`[ruxaimage] Model ${candidate} gagal, coba kandidat lain: ${err.message}`)
         continue
